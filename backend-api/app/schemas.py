@@ -213,6 +213,17 @@ class RecommendationRequest(BaseModel):
     )
 
 
+class ActivityImage(BaseModel):
+    """Event photography metadata - three resolution tiers for optimal loading."""
+    url: str = Field(..., description="Full-resolution image URL (1280px wide) - used on detail page")
+    mediumUrl: Optional[str] = Field(None, description="Medium-resolution image URL (700px wide) - used on activity cards")
+    smallUrl: Optional[str] = Field(None, description="Thumbnail URL (400px wide) - used for small viewports")
+    source: Optional[str] = Field("pexels", description="Photo source (pexels or unsplash)")
+    photographer: Optional[str] = Field("Contributor", description="Photographer attribution")
+    attributionUrl: Optional[str] = Field("", description="URL to photo source")
+    alt: Optional[str] = Field("BNHS Nature Activity", description="Descriptive alt text")
+
+
 class Recommendation(BaseModel):
     """A single recommended activity with match score and explainable reasons."""
     activity_id: Optional[str] = Field(None, description="Unique activity identifier", examples=["bnhs_flamingo_watch_chanakya"])
@@ -224,6 +235,8 @@ class Recommendation(BaseModel):
     duration: Optional[str] = Field(None, description="Expected time commitment", examples=["2 hours"])
     distance: Optional[str] = Field(None, description="Trail distance", examples=["1.5 km"])
     description: Optional[str] = Field(None, description="Summary of activity content")
+    image: Optional[ActivityImage] = Field(None, description="Event photo image metadata")
+    imageUrl: Optional[str] = Field(None, description="Direct URL to event photograph")
     score: float = Field(..., description="Match percentage score between 0 and 100", examples=[94.0])
     reasons: List[str] = Field(..., description="Explainable reasons why this activity was recommended", examples=[["Matches your interest in birds", "Located in Navi Mumbai", "Suitable for beginners"]])
 
@@ -245,9 +258,11 @@ class Activity(BaseModel):
     """Structured BNHS Activity."""
     id: str = Field(..., description="Unique ID", examples=["bnhs_matheran_herpetofauna_camp"])
     name: str = Field(..., description="Activity Name", examples=["Matheran Herpetofauna Camp"])
+    title: Optional[str] = Field(None, description="Activity Title")
     category: str = Field(..., description="Category / Domain", examples=["Herpetology & Field Camps"])
     location: str = Field(..., description="City or region", examples=["Matheran"])
     interests: List[str] = Field(default_factory=list, description="Associated interest tags")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Associated tags")
     difficulty: Optional[str] = Field(None, description="Difficulty level (easy, intermediate, moderate)")
     audience: List[str] = Field(default_factory=list, description="Target audiences")
     duration: Optional[str] = Field(None, description="Duration")
@@ -255,6 +270,12 @@ class Activity(BaseModel):
     description: str = Field(default="", description="Detailed activity description")
     species: List[str] = Field(default_factory=list, description="Focal species or wildlife observed")
     type: str = Field(default="walk", description="Type: walk, camp, course, volunteer")
+    image: Optional[ActivityImage] = Field(None, description="Event photo image metadata")
+    imageUrl: Optional[str] = Field(None, description="Direct URL to event photograph")
+    date: Optional[str] = Field(None, description="Event date")
+    capacity: Optional[int] = Field(None, description="Max participant capacity")
+    registeredCount: Optional[int] = Field(None, description="Registered participant count")
+    status: Optional[str] = Field(default="upcoming", description="Activity status")
 
 
 class ActivitiesResponse(BaseModel):

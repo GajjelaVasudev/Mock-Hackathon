@@ -118,7 +118,6 @@ class RecommendationService:
         activity_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Queries activities catalog returning activity list and data source."""
-        is_mongo = is_mongodb_available()
         activities = self._get_dynamic_activities(
             category=category,
             location=location,
@@ -126,9 +125,45 @@ class RecommendationService:
             activity_type=activity_type,
         )
         return {
-            "source": "mongodb" if is_mongo else "local_fallback",
+            "source": "mongodb" if is_mongodb_available() else "local_json",
             "activities": [a.to_dict() for a in activities],
         }
+
+    def get_activity_by_id(self, activity_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a single activity by id or name from MongoDB or local fallback."""
+        db = get_db()
+        if db is not None and is_mongodb_available():
+            try:
+                coll = db["activities"]
+                query_conditions: List[Dict[str, Any]] = [
+                    {"id": activity_id},
+                    {"name": activity_id},
+                    {"title": activity_id},
+                ]
+                if len(activity_id) == 24:
+                    try:
+                        query_conditions.append({"_id": ObjectId(activity_id)})
+                    except Exception:
+                        pass
+
+                doc = coll.find_one({"$or": query_conditions})
+                if doc:
+                    if "id" not in doc and "_id" in doc:
+                        doc["id"] = str(doc["_id"])
+                    doc.pop("_id", None)
+                    return Activity.from_dict(doc).to_dict()
+            except Exception as e:
+                print(f"⚠️ Error finding activity in MongoDB ({e}). Checking local fallback.")
+
+        # Fallback to local catalog
+        if not self._catalog:
+            self._initialize_engine()
+        if self._catalog:
+            act = self._catalog.get_by_id(activity_id)
+            if act:
+                return act.to_dict()
+
+        return None
 
     def _get_user_profile_from_db(self, user_id: str) -> Optional[UserProfile]:
         """Retrieves a user profile from MongoDB by user_id or _id, including participation history."""

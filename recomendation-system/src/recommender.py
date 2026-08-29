@@ -21,6 +21,7 @@ class RecommendationResult:
         return {
             "activity_id": self.activity.id,
             "activity_name": self.activity.name,
+            "activity": self.activity.name,
             "category": self.activity.category,
             "location": self.activity.location,
             "type": self.activity.type,
@@ -28,6 +29,8 @@ class RecommendationResult:
             "duration": self.activity.duration,
             "distance": self.activity.distance,
             "description": self.activity.description,
+            "image": self.activity.image,
+            "imageUrl": self.activity.imageUrl,
             "score": self.score,
             "reasons": self.reasons,
         }
