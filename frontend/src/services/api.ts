@@ -37,7 +37,8 @@ import {
   ActivityImage,
 } from '../types';
 
-const API_BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
+const API_BASE_URL = envBase !== undefined ? envBase.replace(/\/+$/, '') : '';
 
 class ApiService {
   private baseUrl: string;
@@ -47,7 +48,8 @@ class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const primaryUrl = this.baseUrl ? `${this.baseUrl}${cleanEndpoint}` : cleanEndpoint;
     
     const headers = {
       'Content-Type': 'application/json',
@@ -56,11 +58,25 @@ class ApiService {
     };
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        credentials: 'include', // Support MERN JWT cookies
-      });
+      let response: Response;
+      try {
+        response = await fetch(primaryUrl, {
+          ...options,
+          headers,
+          credentials: 'include', // Support MERN JWT cookies
+        });
+      } catch (fetchErr: any) {
+        // If relative URL failed and baseUrl was empty, attempt direct localhost:3000 fallback
+        if (!this.baseUrl && cleanEndpoint.startsWith('/api')) {
+          response = await fetch(`http://localhost:3000${cleanEndpoint}`, {
+            ...options,
+            headers,
+            credentials: 'include',
+          });
+        } else {
+          throw fetchErr;
+        }
+      }
       
       if (!response.ok) {
         let errorMessage = `HTTP error ${response.status}: ${response.statusText}`;
@@ -85,8 +101,8 @@ class ApiService {
 
       return await response.json() as T;
     } catch (err: any) {
-      if (err.name === 'TypeError' && err.message?.includes('fetch')) {
-        throw new Error(`Unable to connect to Express backend at ${this.baseUrl}. Please ensure Express (port 3000) and FastAPI (port 8000) are running.`);
+      if (err.name === 'TypeError' && (err.message?.includes('fetch') || err.message?.includes('NetworkError'))) {
+        throw new Error(`Unable to connect to Express backend (port 3000). Please make sure the backend server is running via 'node server.js' or 'npm run dev' inside the Backend folder.`);
       }
       throw err;
     }
