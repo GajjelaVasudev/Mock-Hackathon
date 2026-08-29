@@ -1,4 +1,5 @@
 const Activity = require("../models/activity.model");
+const Registration = require("../models/registration.model");
 
 
 // CREATE ACTIVITY
@@ -18,8 +19,11 @@ const getActivities = async (filters = {}) => {
 
   // Filter by tag
   if (filters.tag) {
-    query.tags = filters.tag;
-  }
+    query.$or = [
+        { tags: filters.tag },
+        { interests: filters.tag }
+    ];
+}
 
   // Filter by type
   if (filters.type) {
@@ -88,6 +92,25 @@ const cancelActivity = async (activityId) => {
 
   return activity;
 };
+// GET PARTICIPANTS FOR AN ACTIVITY
+const getActivityRegistrations = async (activityId) => {
+
+  // Check whether the activity exists
+  const activity = await Activity.findById(activityId);
+
+  if (!activity) {
+    throw new Error("Activity not found");
+  }
+
+  // Get all registrations for this activity
+  const registrations = await Registration.find({
+    activity: activityId
+  })
+    .populate("user", "name email")
+    .sort({ registeredAt: 1 });
+
+  return registrations;
+};
 
 
 module.exports = {
@@ -96,4 +119,5 @@ module.exports = {
   getActivityById,
   updateActivity,
   cancelActivity,
+   getActivityRegistrations
 };

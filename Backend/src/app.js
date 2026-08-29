@@ -6,6 +6,8 @@ const app = express();
 
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+
+const activityRoutes = require('./routes/activity.routes');
 const aiRoutes = require('./routes/ai.routes');
 
 app.use(cors({
@@ -15,6 +17,16 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+
+
+// Authentication
+app.use('/api/auth', authRoutes);
+
+// User
+app.use('/api/user', userRoutes);
+
+// Activity Management
+app.use('/api/activities', activityRoutes);
 
 // Mount Existing MERN Routes
 app.use('/api/auth', authRoutes);
