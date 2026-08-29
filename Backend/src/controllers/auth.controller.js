@@ -6,7 +6,7 @@ const { generateOTP } = require('../utils/otp');
 const otpEmail = require('../templates/email.template');
 
 async function registerUser(req, res) {
-    const { username, email, password } = req.body; // role dropped from destructure — see note below
+    const { username, email, password } = req.body; // role dropped from destructure see note below
 
     const existingUser = await userModel.findOne({ $or: [{ username }, { email }] });
 
@@ -20,7 +20,7 @@ async function registerUser(req, res) {
 
     let user;
     if (existingUser && !existingUser.isEmailVerified) {
-        // registered before, never verified — just resend a fresh OTP on the same account
+        // registered before never verified just resend a fresh OTP on the same account
         existingUser.otp = hashedOTP;
         existingUser.otpExpiresAt = otpExpiresAt;
         user = await existingUser.save();
@@ -30,7 +30,7 @@ async function registerUser(req, res) {
             username,
             email,
             password: hashedPassword,
-            role: 'user', // never trust a client-supplied role — see note below
+            role: 'user', // never trust a clientsupplied role see note below
             otp: hashedOTP,
             otpExpiresAt
         });
@@ -88,7 +88,7 @@ async function verifyOTP(req, res) {
     user.otpExpiresAt = undefined;
     await user.save();
 
-    // this is the real moment registration completes — log them in now
+    // this is the real moment registration completes log them in now
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
     res.cookie('token', token);
 
