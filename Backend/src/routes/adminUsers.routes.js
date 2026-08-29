@@ -11,5 +11,7 @@ router.use(authenticate, authorize('admin'));
 router.get('/', adminUsersController.listUsers);
 router.patch('/:id/role', adminUsersController.updateUserRole);
 router.patch('/:id/status', adminUsersController.updateUserStatus);
+router.get('/volunteers/requests', adminUsersController.listVolunteerRequests);
+router.patch('/volunteers/requests/:id', adminUsersController.decideVolunteerRequest);
 
 module.exports = router;

@@ -50,8 +50,35 @@ async function updateUserStatus(req, res) {
     res.json(user);
 }
 
+async function listVolunteerRequests(req, res) {
+    const requests = await UserModel.find({ volunteerStatus: 'requested' }).select('-password');
+    res.json(requests);
+}
+
+async function decideVolunteerRequest(req, res) {
+    const { id } = req.params;
+    const { decision } = req.body; // 'approved' or 'rejected'
+
+    if (!['approved', 'rejected'].includes(decision)) {
+        return res.status(400).json({ message: "decision must be 'approved' or 'rejected'" });
+    }
+
+    const user = await UserModel.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.volunteerStatus !== 'requested') {
+        return res.status(400).json({ message: 'This user has no pending volunteer request' });
+    }
+
+    user.volunteerStatus = decision;
+    await user.save();
+
+    res.json({ message: `Volunteer request ${decision}`, user: { id: user._id, volunteerStatus: user.volunteerStatus } });
+}
+
 module.exports = {
     listUsers,
     updateUserRole,
-    updateUserStatus
+    updateUserStatus,
+    listVolunteerRequests,
+    decideVolunteerRequest
 };

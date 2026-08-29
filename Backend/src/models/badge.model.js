@@ -24,7 +24,8 @@ const BadgeSchema = new mongoose.Schema({
     icon: {
         type: String,
         required: true
-    }
+    },
+    isMilestone: { type: Boolean, default: false }
 
 }, {
     timestamps: true
