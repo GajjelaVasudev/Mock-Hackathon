@@ -1,14 +1,14 @@
+const asyncHandler = require('../utils/asyncHandler');
 const express = require('express');
 const router = express.Router();
 const authenticate = require('../middlewares/auth.middleware');
 const authorize = require('../middlewares/authorize.middleware');
 const badgeController = require('../controllers/badge.controller');
 
-
-router.get('/', authenticate, badgeController.getBadges);
-router.post('/', authenticate, authorize('admin'), badgeController.createBadge);
-router.put('/:id', authenticate, authorize('admin'), badgeController.updateBadge);
-router.delete('/:id', authenticate, authorize('admin'), badgeController.deleteBadge);
+router.get('/', authenticate,  asyncHandler((req, res) => badgeController.getBadges(req, res)));
+router.post('/',  authenticate , authorize('admin'),asyncHandler((req, res) => badgeController.createBadge(req, res)));
+router.put('/:id', authenticate, authorize('admin'),asyncHandler((req, res) => badgeController.updateBadge(req, res)));
+router.delete('/:id', authenticate, authorize('admin'), asyncHandler((req, res) => badgeController.deleteBadge(req, res)));
 
 
 
