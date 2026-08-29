@@ -31,7 +31,19 @@ const CRITERIA_CHECKS = {
             }
         });
         return months.size >= 3;
-    }
+    },
+
+    // --- Milestone: Research Contributor ---
+    // Unlocks at 10 total attended activities.
+    // Represents eligibility to write a BNHS research contribution.
+    // No online verification workflow; any review happens offline through BNHS.
+    attend_10_activities: (attended) => attended.length >= 10,
+
+    // --- Milestone: Nature Trip Opportunity ---
+    // Unlocks at 20 total attended activities. No time limit applies.
+    // Represents eligibility for a special BNHS nature/wildlife trip.
+    // The annual trip schedule is managed separately by BNHS.
+    attend_20_activities: (attended) => attended.length >= 20
 };
 
 async function checkAndAward(userId) {
