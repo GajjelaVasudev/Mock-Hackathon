@@ -82,17 +82,27 @@ async function registerUser(req, res) {
             });
         }
 
+        let emailDelivery;
         try {
-            await sendEmail(trimmedEmail, 'BNHS India - Email Verification OTP', otpEmail(trimmedUsername, otp));
+            emailDelivery = await sendEmail(trimmedEmail, 'BNHS India - Email Verification OTP', otpEmail(trimmedUsername, otp));
         } catch (err) {
-            console.log('Notice: Email delivery simulated in dev mode:', err.message);
+            console.error('Email delivery error during registration:', err.message);
+            return res.status(500).json({
+                message: `Failed to deliver verification email via SMTP: ${err.message}`,
+                error: err.message,
+                deliveryFailed: true
+            });
         }
 
         console.log(`\n========================================\n[BNHS OTP VERIFICATION CODE for ${trimmedEmail}]: ${otp}\n========================================\n`);
 
+        const isSmtp = emailDelivery && emailDelivery.delivered;
         res.status(201).json({
-            message: 'OTP sent. Please verify your email to complete registration.',
-            email: trimmedEmail
+            message: isSmtp
+                ? 'OTP sent successfully to your email inbox.'
+                : 'OTP sent. Please verify your email to complete registration.',
+            email: trimmedEmail,
+            deliveryMode: emailDelivery?.mode || 'dev_simulation'
         });
     } catch (err) {
         console.error('Registration error:', err);
@@ -180,15 +190,26 @@ async function resendOTP(req, res) {
         user.otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
         await user.save();
 
+        let emailDelivery;
         try {
-            await sendEmail(trimmedEmail, 'BNHS India - Email Verification OTP', otpEmail(user.username, otp));
+            emailDelivery = await sendEmail(trimmedEmail, 'BNHS India - Email Verification OTP', otpEmail(user.username, otp));
         } catch (err) {
-            console.log('Notice: Email delivery simulated in dev mode:', err.message);
+            console.error('Resend email delivery error:', err.message);
+            return res.status(500).json({
+                message: `Failed to deliver verification email via SMTP: ${err.message}`,
+                error: err.message,
+                deliveryFailed: true
+            });
         }
 
         console.log(`\n========================================\n[BNHS RESENT OTP CODE for ${trimmedEmail}]: ${otp}\n========================================\n`);
 
-        res.status(200).json({ message: 'A new OTP has been sent to your email.' });
+        res.status(200).json({
+            message: emailDelivery && emailDelivery.delivered
+                ? 'A new OTP has been sent to your email inbox.'
+                : 'A new OTP has been sent to your email.',
+            deliveryMode: emailDelivery?.mode || 'dev_simulation'
+        });
     } catch (err) {
         console.error('Resend OTP error:', err);
         res.status(500).json({ message: err.message || 'Internal server error during OTP resend' });
@@ -235,7 +256,9 @@ async function LoginUser(req, res) {
 
             try {
                 await sendEmail(user.email, 'BNHS India - Email Verification OTP', otpEmail(user.username, otp));
-            } catch (e) {}
+            } catch (e) {
+                console.error('Notice: Email delivery error during unverified login:', e.message);
+            }
 
             console.log(`\n========================================\n[BNHS OTP FOR UNVERIFIED LOGIN ${user.email}]: ${otp}\n========================================\n`);
 
