@@ -9,7 +9,18 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function registerUser(req, res) {
     try {
-        const { username, email, password } = req.body;
+        const {
+            username,
+            email,
+            password,
+            name,
+            location,
+            interests,
+            experienceLevel,
+            experience_level,
+            age_group,
+            preferred_activity_type
+        } = req.body;
 
         if (!username || !email || !password) {
             return res.status(400).json({ message: 'Username, email, and password are required.' });
@@ -44,14 +55,26 @@ async function registerUser(req, res) {
             existingUser.username = trimmedUsername;
             existingUser.email = trimmedEmail;
             existingUser.password = hashedPassword;
+            if (name) existingUser.name = name;
+            if (location) existingUser.location = location;
+            if (interests) existingUser.interests = interests;
+            if (experienceLevel || experience_level) existingUser.experienceLevel = experienceLevel || experience_level;
+            if (age_group) existingUser.age_group = age_group;
+            if (preferred_activity_type) existingUser.preferred_activity_type = preferred_activity_type;
             existingUser.otp = hashedOTP;
             existingUser.otpExpiresAt = otpExpiresAt;
             user = await existingUser.save();
         } else {
             user = await userModel.create({
+                name: name || trimmedUsername,
                 username: trimmedUsername,
                 email: trimmedEmail,
                 password: hashedPassword,
+                location: location || 'Mumbai',
+                interests: interests || ['birds'],
+                experienceLevel: experienceLevel || experience_level || 'beginner',
+                age_group: age_group || 'adult',
+                preferred_activity_type: preferred_activity_type || 'walk',
                 role: 'user',
                 otp: hashedOTP,
                 otpExpiresAt,
