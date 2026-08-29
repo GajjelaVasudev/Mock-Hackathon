@@ -1,3 +1,4 @@
+const asyncHandler = require('../utils/asyncHandler');
 const express = require("express");
 const router = express.Router();
 
@@ -7,13 +8,14 @@ const authMiddleware = require("../middlewares/auth.middleware");
 const authorize = require("../middlewares/authorize.middleware");
 
 
+//wrap every function in asynchandler
 // GET ALL ACTIVITIES
 // Any logged-in user
 // GET /api/activities
 router.get(
     "/",
     authMiddleware,
-    activityController.getActivities
+    asyncHandler(activityController.getActivities)
 );
 
 
@@ -24,7 +26,7 @@ router.get(
     "/:id/registrations",
     authMiddleware,
     authorize("staff", "admin"),
-    activityController.getActivityRegistrations
+    asyncHandler(activityController.getActivityRegistrations)
 );
 
 
@@ -34,7 +36,7 @@ router.get(
 router.get(
     "/:id",
     authMiddleware,
-    activityController.getActivityById
+    asyncHandler(activityController.getActivityById)
 );
 
 
@@ -45,7 +47,7 @@ router.post(
     "/",
     authMiddleware,
     authorize("staff", "admin"),
-    activityController.createActivity
+    asyncHandler(activityController.createActivity)
 );
 
 
@@ -56,7 +58,7 @@ router.put(
     "/:id",
     authMiddleware,
     authorize("staff", "admin"),
-    activityController.updateActivity
+    asyncHandler(activityController.updateActivity)
 );
 
 
@@ -67,7 +69,7 @@ router.delete(
     "/:id",
     authMiddleware,
     authorize("staff", "admin"),
-    activityController.cancelActivity
+    asyncHandler(activityController.cancelActivity)
 );
 
 

@@ -1,3 +1,4 @@
+const asyncHandler = require('../utils/asyncHandler');
 const express = require("express");
 
 const router = express.Router();
@@ -17,12 +18,16 @@ const authorize =
 // Admin cannot register
 router.post(
     "/",
-    authMiddleware,
-    authorize("user"),
-    registrationController.registerForActivity
+    asyncHandler((req, res) => {
+        authMiddleware(req, res, () => {
+            authorize("user")(req, res, () => {
+                registrationController.registerForActivity(req, res);
+            });
+        });
+    })
 );
 
-router.patch('/:id/attendance', authMiddleware, authorize('staff', 'admin'), registrationController.markAttendance);
+router.patch('/:id/attendance', authMiddleware, authorize('staff', 'admin'), asyncHandler(registrationController.markAttendance));
 
 
 module.exports = router;
