@@ -28,6 +28,9 @@ router.post(
 );
 
 router.patch('/:id/attendance', authMiddleware, authorize('staff', 'admin'), asyncHandler(registrationController.markAttendance));
+router.get('/me', authMiddleware, asyncHandler(registrationController.getMyRegistrations));
+
+router.delete('/:id', authMiddleware, asyncHandler(registrationController.cancelRegistration));
 
 
 module.exports = router;

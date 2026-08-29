@@ -44,7 +44,44 @@ const registerForActivity = async (userId, activityId) => {
     return registration;
 };
 
+// GET MY REGISTRATIONS
+const getMyRegistrations = async (userId) => {
+    const registrations = await Registration.find({ user: userId })
+        .populate("activity")
+        .sort({ registeredAt: -1 });
+
+    return registrations;
+};
+
+// CANCEL A REGISTRATION
+const cancelRegistration = async (userId, registrationId) => {
+    const registration = await Registration.findById(registrationId);
+
+    if (!registration) {
+        throw new Error("Registration not found");
+    }
+
+    if (registration.user.toString() !== userId) {
+        throw new Error("Not authorized to cancel this registration");
+    }
+
+    if (registration.status === "attended") {
+        throw new Error("Cannot cancel a registration you already attended");
+    }
+
+    if (registration.status === "cancelled") {
+        throw new Error("Registration is already cancelled");
+    }
+
+    registration.status = "cancelled";
+    await registration.save();
+
+    return registration;
+};
+
 
 module.exports = {
-    registerForActivity
+    registerForActivity,
+    getMyRegistrations,
+    cancelRegistration
 };
