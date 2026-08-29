@@ -17,17 +17,22 @@ import {
   Sparkles,
   MessageSquare,
   Camera,
+  Shield,
 } from 'lucide-react';
 import { Activity, ExperiencePost } from '../types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { RegistrationModal } from '../components/RegistrationModal';
 import { ActivityCard } from '../components/ActivityCard';
 import { NatureImage } from '../components/NatureImage';
+import { useUser } from '../context/UserContext';
 import api from '../services/api';
 
 export const ActivityDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentUser } = useUser();
+  const isAdmin = currentUser?.role === 'admin';
+
   const [activity, setActivity] = useState<Activity | null>(null);
   const [relatedActivities, setRelatedActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -41,24 +46,21 @@ export const ActivityDetailPage: React.FC = () => {
       setLoading(true);
       setError(null);
       setNotFound(false);
+
       try {
-        const found = await api.getActivityById(id);
-        if (!found) {
-          setNotFound(true);
-        } else {
-          setActivity(found);
-          try {
-            const all = await api.getActivities();
-            const related = (all.activities || [])
-              .filter((a) => a.id !== id && (a.category === found.category || a.type === found.type))
-              .slice(0, 3);
-            setRelatedActivities(related);
-          } catch {
-            // ignore related error
-          }
-        }
+        const data = await api.getActivityById(id);
+        setActivity(data);
+
+        // Fetch related activities based on category or type
+        const relatedRes = await api.getActivities({
+          type: data.type,
+        });
+        const cleanList = (relatedRes.activities || []).filter(
+          (a: Activity) => (a.id || a._id) !== (data.id || data._id)
+        );
+        setRelatedActivities(cleanList.slice(0, 3));
       } catch (err: any) {
-        if (err.message && err.message.includes('404')) {
+        if (err.status === 404 || err.message?.includes('404')) {
           setNotFound(true);
         } else {
           setError(err.message || 'Failed to load activity details.');
@@ -67,85 +69,66 @@ export const ActivityDetailPage: React.FC = () => {
         setLoading(false);
       }
     };
+
     loadDetail();
+    window.scrollTo(0, 0);
   }, [id]);
 
   if (loading) {
     return (
-      <div className="container" style={{ padding: '80px 24px', textAlign: 'center' }}>
-        <LoadingSpinner message="Retrieving BNHS activity documentation..." />
+      <div className="container" style={{ padding: '80px 24px' }}>
+        <LoadingSpinner message="Loading activity details & photos..." />
       </div>
     );
   }
 
   if (notFound || !activity) {
     return (
-      <div className="container" style={{ padding: '60px 24px', maxWidth: '600px', textAlign: 'center' }}>
-        <div style={{ padding: '40px 24px', background: '#ffffff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-md)' }}>
-          <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: 'var(--color-warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <Compass size={28} color="#b45309" />
-          </div>
-          <h2 style={{ fontSize: '1.5rem', color: 'var(--color-forest-dark)', marginBottom: '8px' }}>
+      <div className="container" style={{ padding: '80px 24px', textAlign: 'center' }}>
+        <div style={{ maxWidth: '460px', margin: '0 auto' }}>
+          <AlertCircle size={48} color="var(--color-rust)" style={{ marginBottom: '16px' }} />
+          <h2 style={{ fontSize: '1.8rem', color: 'var(--color-forest-dark)', marginBottom: '8px' }}>
             Activity Not Found
           </h2>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.92rem', marginBottom: '24px', lineHeight: 1.5 }}>
-            The requested activity <code style={{ background: 'var(--color-bg-alt)', padding: '2px 6px', borderRadius: '4px' }}>{id}</code> could not be found in the BNHS catalog. It may have been relocated or updated.
+          <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px' }}>
+            The activity you are looking for does not exist or may have been removed.
           </p>
-          <Link to="/activities" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-            <ArrowLeft size={16} /> Browse Activities Catalog
+          <Link to="/activities" className="btn btn-primary">
+            <ArrowLeft size={16} /> Back to Activities
           </Link>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="container" style={{ padding: '60px 24px', maxWidth: '600px', textAlign: 'center' }}>
-        <div style={{ padding: '40px 24px', background: '#ffffff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-border)' }}>
-          <AlertCircle size={36} color="var(--color-danger)" style={{ margin: '0 auto 16px' }} />
-          <h2 style={{ fontSize: '1.4rem', color: 'var(--color-forest-dark)', marginBottom: '8px' }}>
-            Unable to Load Activity Details
-          </h2>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>{error}</p>
-          <button onClick={() => window.location.reload()} className="btn btn-secondary">
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const isRegistrationAllowed = !activity.status || activity.status === 'upcoming' || activity.status === 'open';
+  const activityTitle = activity.title || activity.name;
   const isFull = activity.status === 'full';
   const isCompleted = activity.status === 'completed';
-  const isCancelled = activity.status === 'cancelled';
-
-  const activityTitle = activity.title || activity.name;
-  const activityTags = activity.tags?.length ? activity.tags : (activity.interests?.length ? activity.interests : (activity.species || []));
+  const isRegistrationAllowed = activity.status === 'upcoming' || !activity.status;
 
   return (
-    <div className="container" style={{ padding: '40px 24px 80px' }}>
-      {/* Back Link */}
-      <Link
-        to="/activities"
+    <div className="container" style={{ padding: '32px 24px 80px' }}>
+      {/* Back Button */}
+      <div style={{ marginBottom: '24px' }}>
+        <button
+          onClick={() => navigate(-1)}
+          className="btn btn-secondary btn-sm"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
+      </div>
+
+      <div
         style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '0.9rem',
-          fontWeight: 600,
-          color: 'var(--color-text-muted)',
-          marginBottom: '24px',
-          textDecoration: 'none',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.8fr) minmax(300px, 1fr)',
+          gap: '40px',
+          alignItems: 'start',
+          marginBottom: '60px',
         }}
       >
-        <ArrowLeft size={16} />
-        Back to Activities Catalog
-      </Link>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '32px', marginBottom: '60px' }}>
-        {/* Main Left Details */}
+        {/* Left Column: Details */}
         <div
           style={{
             background: 'var(--color-surface)',
@@ -250,77 +233,86 @@ export const ActivityDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* Key Info Grid */}
+          {/* Metadata Grid */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-              gap: '14px',
-              background: 'var(--color-bg)',
-              borderRadius: 'var(--radius-lg)',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '16px',
               padding: '20px',
+              backgroundColor: 'var(--color-bg)',
+              borderRadius: 'var(--radius-lg)',
               marginBottom: '28px',
-              border: '1px solid var(--color-border)',
             }}
           >
-            <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
-                Location
-              </span>
-              <div style={{ fontWeight: 600, color: 'var(--color-forest-dark)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                <MapPin size={15} style={{ color: 'var(--color-emerald)' }} />
-                {activity.location || 'Mumbai'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <MapPin size={20} color="var(--color-emerald)" />
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block' }}>Location</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--color-text-dark)' }}>{activity.location}</strong>
               </div>
             </div>
 
-            <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
-                Date / Timing
-              </span>
-              <div style={{ fontWeight: 600, color: 'var(--color-forest-dark)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                <Calendar size={15} style={{ color: 'var(--color-emerald)' }} />
-                {activity.date ? new Date(activity.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Upcoming Field Session'}
+            {activity.duration && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Clock size={20} color="var(--color-emerald)" />
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block' }}>Duration</span>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--color-text-dark)' }}>{activity.duration}</strong>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
-                Capacity / Booked
-              </span>
-              <div style={{ fontWeight: 600, color: 'var(--color-forest-dark)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                <Users size={15} style={{ color: 'var(--color-emerald)' }} />
-                {activity.registeredCount || 0} / {activity.capacity || 30}
+            {activity.difficulty && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Compass size={20} color="var(--color-emerald)" />
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block' }}>Difficulty</span>
+                  <strong style={{ fontSize: '0.9rem', color: 'var(--color-text-dark)', textTransform: 'capitalize' }}>{activity.difficulty}</strong>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
-                Difficulty
-              </span>
-              <div style={{ fontWeight: 600, color: 'var(--color-forest-dark)', textTransform: 'capitalize', marginTop: '2px' }}>
-                {activity.difficulty || 'All Levels'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Users size={20} color="var(--color-emerald)" />
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block' }}>Capacity</span>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--color-text-dark)' }}>{activity.capacity || 30} max spots</strong>
               </div>
             </div>
           </div>
 
           {/* Description */}
           <div style={{ marginBottom: '28px' }}>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '10px', color: 'var(--color-forest-dark)' }}>Overview</h3>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '1rem', lineHeight: 1.7, margin: 0 }}>
-              {activity.description || 'Guided exploration of regional ecosystem and wildlife with BNHS experts.'}
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '12px', color: 'var(--color-forest-dark)' }}>
+              About This Field Program
+            </h3>
+            <p style={{ lineHeight: 1.7, color: 'var(--color-text-dark)', fontSize: '0.98rem' }}>
+              {activity.description}
             </p>
           </div>
 
-          {/* Tags & Interests */}
-          {activityTags && activityTags.length > 0 && (
+          {/* Species Observed / Focus */}
+          {activity.species && activity.species.length > 0 && (
             <div style={{ marginBottom: '28px' }}>
-              <h3 style={{ fontSize: '1.15rem', marginBottom: '10px', color: 'var(--color-forest-dark)' }}>
-                Field Tags & Themes
+              <h3 style={{ fontSize: '1.25rem', marginBottom: '12px', color: 'var(--color-forest-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={18} color="var(--color-emerald)" />
+                Target Species & Key Focus
               </h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {activityTags.map((tag, i) => (
-                  <span key={i} className="tag" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-emerald)', color: 'var(--color-forest-dark)', fontWeight: 600 }}>
-                    🌿 {tag}
+                {activity.species.map((sp: string, idx: number) => (
+                  <span
+                    key={idx}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'var(--color-sage-light)',
+                      color: 'var(--color-forest-dark)',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    🌿 {sp}
                   </span>
                 ))}
               </div>
@@ -370,10 +362,12 @@ export const ActivityDetailPage: React.FC = () => {
             </div>
 
             <h3 style={{ fontSize: '1.4rem', color: 'var(--color-forest-dark)', marginBottom: '8px' }}>
-              {isRegistrationAllowed ? 'Reserve Your Spot' : 'Activity Status'}
+              {isAdmin ? 'Event Overview' : isRegistrationAllowed ? 'Reserve Your Spot' : 'Activity Status'}
             </h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
-              {isRegistrationAllowed
+              {isAdmin
+                ? 'Administrator mode. View event information and track participants from Organizer Dashboard.'
+                : isRegistrationAllowed
                 ? 'Naturalist-guided field group limited to ensure maximum observation quality.'
                 : isFull
                 ? 'This activity has reached maximum capacity.'
@@ -390,7 +384,27 @@ export const ActivityDetailPage: React.FC = () => {
               <div><strong>Certificates:</strong> Provided by BNHS on completion</div>
             </div>
 
-            {isRegistrationAllowed ? (
+            {isAdmin ? (
+              <div
+                style={{
+                  padding: '14px 18px',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  textAlign: 'center',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Shield size={18} color="#64748b" />
+                <span>Admin View • Event Management</span>
+              </div>
+            ) : isRegistrationAllowed ? (
               <button
                 onClick={() => setModalOpen(true)}
                 className="btn btn-primary btn-lg"
@@ -462,22 +476,28 @@ export const ActivityDetailPage: React.FC = () => {
               <ActivityCard
                 key={act.id}
                 activity={act}
-                onRegisterClick={(a) => {
-                  setActivity(a);
-                  setModalOpen(true);
-                }}
+                onRegisterClick={
+                  isAdmin
+                    ? undefined
+                    : (a) => {
+                        setActivity(a);
+                        setModalOpen(true);
+                      }
+                }
               />
             ))}
           </div>
         </div>
       )}
 
-      {/* Registration Modal */}
-      <RegistrationModal
-        activity={activity}
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-      />
+      {/* Registration Modal (Members and Users only) */}
+      {!isAdmin && (
+        <RegistrationModal
+          activity={activity}
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

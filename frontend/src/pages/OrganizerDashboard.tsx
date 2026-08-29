@@ -38,6 +38,7 @@ import { CreateEventModal } from '../components/CreateEventModal';
 import { InviteLeaderModal } from '../components/InviteLeaderModal';
 import { EventParticipantsModal } from '../components/EventParticipantsModal';
 import { AdminVolunteerRequestModal } from '../components/AdminVolunteerRequestModal';
+import { AdminAchievementsPanel } from '../components/admin/AdminAchievementsPanel';
 import api from '../services/api';
 
 export const OrganizerDashboard: React.FC = () => {
@@ -496,6 +497,9 @@ export const OrganizerDashboard: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* SECTION: ACHIEVEMENTS & RECOGNITION MANAGEMENT */}
+          <AdminAchievementsPanel />
 
           {/* SECTION 3: MEMBER MANAGEMENT */}
           <div className="card" style={{ padding: '28px', background: '#ffffff' }}>

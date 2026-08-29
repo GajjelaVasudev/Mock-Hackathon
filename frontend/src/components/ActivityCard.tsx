@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Clock, Footprints, Users, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { MapPin, Clock, Footprints, Users, ArrowUpRight, CheckCircle2, Shield } from 'lucide-react';
 import { Activity } from '../types';
 import { NatureImage } from './NatureImage';
+import { useUser } from '../context/UserContext';
 
 interface ActivityCardProps {
   activity: Activity;
@@ -12,6 +13,9 @@ interface ActivityCardProps {
 }
 
 export const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onRegisterClick, index = 0 }) => {
+  const { currentUser } = useUser();
+  const isAdmin = currentUser?.role === 'admin';
+
   const getBadgeClass = (type: string) => {
     switch (type.toLowerCase()) {
       case 'camp': return 'badge-camp';
@@ -152,16 +156,24 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onRegister
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', marginTop: 'auto' }}>
+        <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', marginTop: 'auto', alignItems: 'center' }}>
           <Link
             to={`/activities/${encodeURIComponent(activity.id || activity._id || '')}`}
             className="btn btn-secondary btn-sm"
-            style={{ flex: 1, textAlign: 'center', justifyContent: 'center' }}
+            style={{
+              flex: 1,
+              width: '100%',
+              textAlign: 'center',
+              justifyContent: 'center',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
           >
             Details
             <ArrowUpRight size={14} />
           </Link>
-          {onRegisterClick && (
+          {!isAdmin && onRegisterClick && (
             <button
               onClick={() => onRegisterClick(activity)}
               className="btn btn-primary btn-sm"

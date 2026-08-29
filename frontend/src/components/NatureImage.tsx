@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ExternalLink, Leaf } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { ActivityImage } from '../types';
 import { getMediaUrl } from '../utils/media';
 
@@ -264,18 +264,20 @@ export const NatureImage: React.FC<NatureImageProps> = ({
               width: '42px',
               height: '42px',
               borderRadius: '50%',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              backgroundColor: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: '8px',
+              padding: '4px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
             }}
           >
-            <Leaf size={22} color="#ffffff" />
+            <img src="/bnhs-logo-bird.png" alt="BNHS" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
           </div>
 
           <div style={{ fontSize: '0.85rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
-            🌿 BNHS Nature Activity
+            BNHS Nature Activity
           </div>
           <div style={{ fontSize: '0.72rem', opacity: 0.9, marginTop: '2px' }}>
             {type.toUpperCase()} · {category}

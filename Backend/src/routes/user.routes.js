@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
 const volunteerController = require('../controllers/volunteer.controller');
+const achievementController = require('../controllers/achievement.controller');
 const authenticate = require('../middlewares/auth.middleware');
 
 router.use(authenticate);
@@ -11,6 +12,11 @@ router.get('/me', asyncHandler(userController.getCurrentUser));
 router.put('/me', asyncHandler(userController.updateCurrentUser));
 router.get('/me/journey', asyncHandler(userController.getUserJourney));
 router.post('/me/volunteer-request', asyncHandler(userController.requestVolunteer));
+
+// Nature Achievements & Attendance Summary
+router.get('/achievements', asyncHandler(achievementController.getUserAchievements));
+router.get('/attendance-summary', asyncHandler(achievementController.getUserAttendanceSummary));
+router.get('/achievements/certificate/:certId', asyncHandler(achievementController.getCertificateDetails));
 
 // User event lead invitations
 router.get('/event-lead-invitations', asyncHandler(userController.getUserInvitations));

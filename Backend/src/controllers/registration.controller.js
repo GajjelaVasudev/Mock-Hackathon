@@ -6,7 +6,14 @@ const badgeService = require('../services/badge.service');
 const registerForActivity = async (req, res) => {
     try {
         const userId = req.user.id || req.user._id;
+        const userRole = req.user.role;
         const activityId = req.body.activityId || req.body.activity_id;
+
+        if (userRole === 'admin') {
+            return res.status(403).json({
+                message: "Administrators cannot register for activities. Event participation is reserved for community members."
+            });
+        }
 
         if (!activityId) {
             return res.status(400).json({

@@ -31,6 +31,7 @@ import {
 } from '../types';
 import { RecommendationCard } from '../components/RecommendationCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { NatureAchievementsSection } from '../components/achievements/NatureAchievementsSection';
 import api from '../services/api';
 
 export const MemberDashboard: React.FC = () => {
@@ -176,6 +177,9 @@ export const MemberDashboard: React.FC = () => {
         <LoadingSpinner message="Loading your Nature Passport and engagement milestones..." />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          {/* SECTION: NATURE ACHIEVEMENTS & RECOGNITION */}
+          <NatureAchievementsSection userName={currentUser.name} onRefreshParent={fetchMemberData} />
+
           {/* SECTION: PENDING EVENT LEAD INVITATIONS (IF ANY) */}
           {pendingInvitations.length > 0 && (
             <div

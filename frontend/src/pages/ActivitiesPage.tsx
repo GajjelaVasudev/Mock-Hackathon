@@ -7,9 +7,13 @@ import { RegistrationModal } from '../components/RegistrationModal';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { EmptyState } from '../components/EmptyState';
+import { useUser } from '../context/UserContext';
 import api from '../services/api';
 
 export const ActivitiesPage: React.FC = () => {
+  const { currentUser } = useUser();
+  const isAdmin = currentUser?.role === 'admin';
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +83,7 @@ export const ActivitiesPage: React.FC = () => {
   };
 
   const handleRegisterClick = (activity: Activity) => {
+    if (isAdmin) return;
     setSelectedActivity(activity);
     setModalOpen(true);
   };
@@ -132,19 +137,21 @@ export const ActivitiesPage: React.FC = () => {
                 key={activity.id}
                 activity={activity}
                 index={index}
-                onRegisterClick={handleRegisterClick}
+                onRegisterClick={isAdmin ? undefined : handleRegisterClick}
               />
             ))}
           </div>
         </>
       )}
 
-      {/* Registration Modal */}
-      <RegistrationModal
-        activity={selectedActivity}
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-      />
+      {/* Registration Modal (Members and Users only) */}
+      {!isAdmin && (
+        <RegistrationModal
+          activity={selectedActivity}
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

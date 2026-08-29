@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Leaf, Lock, Mail, User, ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import api from '../services/api';
 
@@ -84,8 +84,8 @@ export const LoginPage: React.FC = () => {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Leaf size={22} color="#b7e4c7" />
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+              <img src="/bnhs-logo-bird.png" alt="BNHS Logo" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
             </div>
             <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '0.04em' }}>BNHS INDIA</span>
           </div>
