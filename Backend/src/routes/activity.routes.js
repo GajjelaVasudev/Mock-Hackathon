@@ -8,7 +8,8 @@ const authorize = require("../middlewares/authorize.middleware");
 
 
 // GET ALL ACTIVITIES
-// Any logged-in user can browse activities
+// Any logged-in user
+// GET /api/activities
 router.get(
     "/",
     authMiddleware,
@@ -16,8 +17,20 @@ router.get(
 );
 
 
+// GET PARTICIPANTS FOR AN ACTIVITY
+// Staff/Admin
+// GET /api/activities/:id/registrations
+router.get(
+    "/:id/registrations",
+    authMiddleware,
+    authorize("staff", "admin"),
+    activityController.getActivityRegistrations
+);
+
+
 // GET ACTIVITY BY ID
-// Any logged-in user can view activity details
+// Any logged-in user
+// GET /api/activities/:id
 router.get(
     "/:id",
     authMiddleware,
@@ -26,7 +39,8 @@ router.get(
 
 
 // CREATE ACTIVITY
-// Only staff and admin can create
+// Staff/Admin
+// POST /api/activities
 router.post(
     "/",
     authMiddleware,
@@ -36,7 +50,8 @@ router.post(
 
 
 // UPDATE ACTIVITY
-// Staff/admin
+// Staff/Admin
+// PUT /api/activities/:id
 router.put(
     "/:id",
     authMiddleware,
@@ -46,7 +61,8 @@ router.put(
 
 
 // CANCEL ACTIVITY
-// Staff/admin
+// Staff/Admin
+// DELETE /api/activities/:id
 router.delete(
     "/:id",
     authMiddleware,

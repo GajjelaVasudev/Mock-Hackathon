@@ -140,10 +140,40 @@ const cancelActivity = async (req, res) => {
 };
 
 
+// GET PARTICIPANTS FOR AN ACTIVITY
+const getActivityRegistrations = async (req, res) => {
+    try {
+        const activityId = req.params.id;
+
+        const registrations =
+            await activityService.getActivityRegistrations(activityId);
+
+        return res.status(200).json({
+            count: registrations.length,
+            registrations
+        });
+
+    } catch (error) {
+        console.error(error);
+
+        if (error.message === "Activity not found") {
+            return res.status(404).json({
+                message: "Activity not found"
+            });
+        }
+
+        return res.status(500).json({
+            message: "Failed to fetch activity registrations"
+        });
+    }
+};
+
+
 module.exports = {
     createActivity,
     getActivities,
     getActivityById,
     updateActivity,
-    cancelActivity
+    cancelActivity,
+    getActivityRegistrations
 };
