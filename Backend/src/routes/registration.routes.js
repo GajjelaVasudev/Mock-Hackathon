@@ -22,5 +22,7 @@ router.post(
     registrationController.registerForActivity
 );
 
+router.patch('/:id/attendance', authMiddleware, authorize('staff', 'admin'), registrationController.markAttendance);
+
 
 module.exports = router;
