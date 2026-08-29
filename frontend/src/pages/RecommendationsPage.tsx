@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Sparkles, SlidersHorizontal, RefreshCw, UserCheck, ArrowRight } from 'lucide-react';
 import { Activity, Recommendation } from '../types';
 import { RecommendationCard } from '../components/RecommendationCard';
@@ -7,11 +7,17 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { EmptyState } from '../components/EmptyState';
 import { RegistrationModal } from '../components/RegistrationModal';
-import { useUser, DEMO_PERSONAS } from '../context/UserContext';
+import { useUser } from '../context/UserContext';
 import api from '../services/api';
 
 export const RecommendationsPage: React.FC = () => {
-  const { currentUser, activePersonaId, switchPersona } = useUser();
+  const { currentUser } = useUser();
+
+  // Admin users are responsible for managing activities and do not use personal recommendations
+  if (currentUser?.role === 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

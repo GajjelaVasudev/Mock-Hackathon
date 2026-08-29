@@ -41,6 +41,9 @@ node_modules/
 dist/
 .npm/
 *.log
+Backend/uploads/*
+!Backend/uploads/.gitkeep
+Backend/user_cookies.txt
 
 # OS / IDE
 .DS_Store

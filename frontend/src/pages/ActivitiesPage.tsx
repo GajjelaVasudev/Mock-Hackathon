@@ -14,7 +14,6 @@ export const ActivitiesPage: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dataSource, setDataSource] = useState<string>('mongodb');
 
   // Modal State
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
@@ -43,13 +42,13 @@ export const ActivitiesPage: React.FC = () => {
           (a: Activity) =>
             a.name.toLowerCase().includes(query) ||
             a.description.toLowerCase().includes(query) ||
-            a.interests.some((tag: string) => tag.toLowerCase().includes(query)) ||
+            a.interests?.some((tag: string) => tag.toLowerCase().includes(query)) ||
+            a.tags?.some((tag: string) => tag.toLowerCase().includes(query)) ||
             a.species?.some((s: string) => s.toLowerCase().includes(query))
         );
       }
 
       setActivities(list);
-      setDataSource(res.source);
     } catch (err: any) {
       setError(err.message || 'Failed to load activities from BNHS backend.');
     } finally {
@@ -88,14 +87,9 @@ export const ActivitiesPage: React.FC = () => {
     <div className="container" style={{ padding: '40px 24px 80px' }}>
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-emerald)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Authentic Inventory
-          </span>
-          <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: dataSource === 'mongodb' ? 'var(--color-sage-light)' : 'var(--color-warning-bg)', color: dataSource === 'mongodb' ? 'var(--color-forest-primary)' : 'var(--color-warning)', fontWeight: 600 }}>
-            Source: {dataSource}
-          </span>
-        </div>
+        <span style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-emerald)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+          Authentic Inventory
+        </span>
         <h1 style={{ fontSize: '2.5rem', color: 'var(--color-forest-dark)', marginBottom: '10px' }}>
           Explore BNHS Activities
         </h1>
@@ -103,6 +97,7 @@ export const ActivitiesPage: React.FC = () => {
           Discover naturalist-led nature walks, herpetology field camps, certificate biodiversity courses, and volunteer opportunities.
         </p>
       </div>
+
 
       {/* Filter Component */}
       <FilterBar
@@ -132,10 +127,11 @@ export const ActivitiesPage: React.FC = () => {
           </div>
 
           <div className="cards-grid" style={{ marginTop: 0 }}>
-            {activities.map((activity) => (
+            {activities.map((activity, index) => (
               <ActivityCard
                 key={activity.id}
                 activity={activity}
+                index={index}
                 onRegisterClick={handleRegisterClick}
               />
             ))}

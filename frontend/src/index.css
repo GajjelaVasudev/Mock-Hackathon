@@ -889,4 +889,41 @@ button {
     flex-direction: column;
     gap: 12px;
   }
+  .auth-brand-panel {
+    display: none !important;
+  }
 }
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* ===================================================
+   NatureImage — skeleton shimmer & stable aspect-ratio
+   =================================================== */
+@keyframes bnhsShimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+.nature-image-container {
+  /* Prevent Cumulative Layout Shift (CLS) by locking the block height
+     via aspect-ratio (set inline) even before the photograph loads.     */
+  contain: layout style;
+  will-change: opacity;
+}
+
+.nature-image-container img {
+  /* Images are positioned absolutely inside the locked container so they
+     never cause reflow even during the loading ↔ loaded transition.      */
+  position: absolute;
+  inset: 0;
+}
+

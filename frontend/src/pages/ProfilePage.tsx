@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   MapPin,
@@ -9,8 +9,9 @@ import {
   AlertCircle,
   Compass,
   Sliders,
+  Shield,
 } from 'lucide-react';
-import { useUser, DEMO_PERSONAS } from '../context/UserContext';
+import { useUser } from '../context/UserContext';
 import { UserProfile } from '../types';
 
 const AVAILABLE_INTERESTS = [
@@ -36,20 +37,32 @@ const AVAILABLE_INTERESTS = [
 ];
 
 export const ProfilePage: React.FC = () => {
-  const { currentUser, updateProfile, switchPersona, activePersonaId } = useUser();
+  const { currentUser, updateProfile } = useUser();
 
   const [formData, setFormData] = useState<Partial<UserProfile>>({
     name: currentUser.name,
     email: currentUser.email,
-    location: currentUser.location,
-    age_group: currentUser.age_group,
-    experience_level: currentUser.experience_level,
+    location: currentUser.location || 'Mumbai',
+    age_group: currentUser.age_group || 'adult',
+    experience_level: currentUser.experience_level || 'beginner',
     preferred_activity_type: currentUser.preferred_activity_type || '',
-    interests: [...currentUser.interests],
+    interests: [...(currentUser.interests || [])],
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFormData({
+      name: currentUser.name,
+      email: currentUser.email,
+      location: currentUser.location || 'Mumbai',
+      age_group: currentUser.age_group || 'adult',
+      experience_level: currentUser.experience_level || 'beginner',
+      preferred_activity_type: currentUser.preferred_activity_type || '',
+      interests: [...(currentUser.interests || [])],
+    });
+  }, [currentUser]);
 
   const toggleInterest = (interest: string) => {
     const current = formData.interests || [];
@@ -72,7 +85,7 @@ export const ProfilePage: React.FC = () => {
     setSuccessMsg(null);
     try {
       await updateProfile(formData);
-      setSuccessMsg('Profile updated successfully in MongoDB!');
+      setSuccessMsg('Profile and nature preferences updated successfully!');
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
       alert(`Error saving profile: ${err.message}`);
@@ -85,74 +98,22 @@ export const ProfilePage: React.FC = () => {
     <div className="container-narrow" style={{ padding: '40px 24px 80px' }}>
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-emerald)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Account Settings
+          </span>
+          {currentUser.role && (
+            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--color-sage-light)', color: 'var(--color-forest-primary)', fontWeight: 700, textTransform: 'uppercase' }}>
+              Role: {currentUser.role}
+            </span>
+          )}
+        </div>
         <h1 style={{ fontSize: '2.5rem', color: 'var(--color-forest-dark)', marginBottom: '8px' }}>
           Nature Engagement Profile
         </h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '1.05rem' }}>
-          Manage your interests, location, and activity format preferences used by the recommendation engine.
+          Manage your interests, location, and activity preferences used by our personalized recommendation engine.
         </p>
-      </div>
-
-      {/* Demo Persona Quick Switcher */}
-      <div
-        style={{
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-xl)',
-          padding: '24px',
-          marginBottom: '32px',
-          boxShadow: 'var(--shadow-sm)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-          <Sparkles size={18} style={{ color: 'var(--color-mint-bright)' }} />
-          <h3 style={{ fontSize: '1.15rem', color: 'var(--color-forest-dark)' }}>
-            Switch Test Persona
-          </h3>
-        </div>
-        <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
-          Select a persona below to simulate how the recommendation engine customizes suggestions for different backgrounds:
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
-          {DEMO_PERSONAS.map((p) => {
-            const isActive = activePersonaId === p.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={async () => {
-                  await switchPersona(p.id);
-                  setFormData({
-                    name: p.name,
-                    email: `${p.id}@bnhs.org`,
-                    location: p.location,
-                    age_group: p.age_group,
-                    experience_level: p.experience_level,
-                    preferred_activity_type: p.preferred_activity_type,
-                    interests: [...p.interests],
-                  });
-                }}
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-md)',
-                  border: `1.5px solid ${isActive ? 'var(--color-emerald-light)' : 'var(--color-border)'}`,
-                  background: isActive ? 'var(--color-sage-light)' : 'var(--color-bg)',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ fontSize: '1.2rem', marginBottom: '4px' }}>{p.avatar}</div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-forest-dark)' }}>
-                  {p.name}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                  {p.role}
-                </div>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* Main Profile Form */}
@@ -167,11 +128,11 @@ export const ProfilePage: React.FC = () => {
         }}
       >
         <h3 style={{ fontSize: '1.3rem', marginBottom: '24px', color: 'var(--color-forest-dark)' }}>
-          Profile Details
+          Personal & Field Preferences
         </h3>
 
         {/* Name & Email */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '20px' }}>
           <div>
             <label className="filter-label">Full Name</label>
             <input
@@ -205,7 +166,7 @@ export const ProfilePage: React.FC = () => {
               <option value="Mumbai">Mumbai</option>
               <option value="Navi Mumbai">Navi Mumbai</option>
               <option value="Pune">Pune</option>
-              <option value="Delhi">Delhi</option>
+              <option value="Delhi">Delhi (CEC Asola Bhatti)</option>
               <option value="Maharashtra">Maharashtra (General)</option>
               <option value="Other">Other India</option>
             </select>
@@ -240,7 +201,7 @@ export const ProfilePage: React.FC = () => {
           </div>
 
           <div>
-            <label className="filter-label">Preferred Activity Format</label>
+            <label className="filter-label">Preferred Format</label>
             <select
               value={formData.preferred_activity_type || ''}
               onChange={(e) => setFormData({ ...formData, preferred_activity_type: e.target.value || null })}
@@ -262,7 +223,7 @@ export const ProfilePage: React.FC = () => {
               Nature Interests (Selected: {formData.interests?.length || 0})
             </label>
             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              Click tags to toggle
+              Click tags to toggle preferences
             </span>
           </div>
 
@@ -326,7 +287,7 @@ export const ProfilePage: React.FC = () => {
           style={{ width: '100%' }}
         >
           <Save size={18} />
-          {isSaving ? 'Saving Profile...' : 'Save Profile Changes'}
+          {isSaving ? 'Saving Preferences...' : 'Save Profile Changes'}
         </button>
       </form>
     </div>

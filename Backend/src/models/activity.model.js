@@ -1,10 +1,18 @@
 const mongoose = require('mongoose');
 
 const ActivitySchema = new mongoose.Schema({
+    id: {
+        type: String,
+        trim: true
+    },
 
     title: {
         type: String,
-        required: true,
+        trim: true
+    },
+
+    name: {
+        type: String,
         trim: true
     },
 
@@ -16,7 +24,12 @@ const ActivitySchema = new mongoose.Schema({
     type: {
         type: String,
         required: true,
-        enum: ['trail', 'camp', 'course', 'monitoring', 'conservation-project']
+        enum: ['walk', 'camp', 'course', 'volunteer', 'trail', 'monitoring', 'conservation-project']
+    },
+
+    category: {
+        type: String,
+        default: 'Nature Activities'
     },
 
     tags: {
@@ -24,9 +37,14 @@ const ActivitySchema = new mongoose.Schema({
         default: []
     },
 
+    interests: {
+        type: [String],
+        default: []
+    },
+
     date: {
         type: Date,
-        required: true
+        default: Date.now
     },
 
     location: {
@@ -36,23 +54,71 @@ const ActivitySchema = new mongoose.Schema({
 
     capacity: {
         type: Number,
-        required: true
+        default: 30
+    },
+
+    registeredCount: {
+        type: Number,
+        default: 0
+    },
+
+    leader: {
+        type: String,
+        default: null
     },
 
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+        type: mongoose.Schema.Types.Mixed,
+        default: 'admin'
     },
 
     status: {
         type: String,
-        enum: ['upcoming', 'ongoing', 'completed', 'cancelled'],
+        enum: ['draft', 'upcoming', 'open', 'ongoing', 'full', 'completed', 'cancelled'],
         default: 'upcoming'
-    }
+    },
 
+    difficulty: {
+        type: String,
+        default: 'moderate'
+    },
+
+    duration: {
+        type: String,
+        default: '2-3 hours'
+    },
+
+    image: {
+        url: { type: String, trim: true },
+        mediumUrl: { type: String, trim: true },
+        smallUrl: { type: String, trim: true },
+        source: { type: String, default: 'pexels' },
+        photographer: { type: String, trim: true },
+        attributionUrl: { type: String, trim: true },
+        alt: { type: String, trim: true }
+    },
+
+    imageUrl: {
+        type: String,
+        trim: true
+    }
 }, {
     timestamps: true
+});
+
+// Hook to ensure name and title remain synchronized
+ActivitySchema.pre('save', function() {
+    if (this.title && !this.name) this.name = this.title;
+    if (this.name && !this.title) this.title = this.name;
+    if (!this.id) {
+        this.id = 'bnhs_' + (this.name || this.title || 'event').toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40) + '_' + Date.now().toString(36);
+    }
+    if (this.tags && this.tags.length && (!this.interests || !this.interests.length)) {
+        this.interests = this.tags;
+    }
+    if (this.interests && this.interests.length && (!this.tags || !this.tags.length)) {
+        this.tags = this.interests;
+    }
 });
 
 const ActivityModel = mongoose.model('Activity', ActivitySchema);
