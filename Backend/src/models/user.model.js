@@ -23,10 +23,26 @@ const UserSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        default: 'buyer',
-        enum: ['seller', 'buyer', 'admin']
+        default: 'user',
+        enum: ['staff', 'admin', 'user']
         
     },
+    interests:{
+        type: [String],
+        default: []
+    },
+    badges: [
+            {
+                badge: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Badge'
+                },
+                earnedAt: {
+                    type: Date,
+                    default: Date.now
+                }
+            }
+        ],
     isActive: {
         type: Boolean,
         default: true
