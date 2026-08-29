@@ -14,6 +14,7 @@ const activityRoutes = require('./routes/activity.routes');
 const aiRoutes = require('./routes/ai.routes');
 const registrationRoutes = require('./routes/registration.routes');
 const communityRoutes = require('./routes/community.routes');
+const errorHandler = require('./middlewares/error.middleware');
 
 app.use(cors({
     origin: ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"],
@@ -48,5 +49,7 @@ app.use('/api/community', communityRoutes);
 
 // Mount Python AI Integration Gateway Routes
 app.use('/api/ai', aiRoutes);
+
+app.use(errorHandler);
 
 module.exports = app;

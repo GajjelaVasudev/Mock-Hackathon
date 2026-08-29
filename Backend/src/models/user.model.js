@@ -61,7 +61,13 @@ const UserSchema = new mongoose.Schema({
     isEmailVerified:{
         type: Boolean,
         default: false
-    }
+    },
+    volunteerStatus: {
+    type: String,
+    enum: ['none', 'requested', 'approved', 'rejected'],
+    default: 'none'
+    },
+    volunteerRequestedAt: Date
 },{
     timestamps: true
 });
