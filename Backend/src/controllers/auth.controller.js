@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../services/email.service');
 const {generateOTP} = require('../utils/otp');
-const otpEmail = require('../templates/otp.email');
+const otpEmail = require('../templates/email.template');
 
 async function registerUser(req, res) {
     const { username, email, password, role } = req.body;
