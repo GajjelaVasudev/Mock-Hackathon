@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
+const authenticate = require('../middlewares/auth.middleware');
 
-router.get('/me', userController.getCurrentUser);
-router.put('/me', userController.updateCurrentUser);
+router.get('/me', authenticate, userController.getCurrentUser);
+router.put('/me', authenticate, userController.updateCurrentUser);
 router.get('/me/joruney', userController.getUserJourney);
 
 
