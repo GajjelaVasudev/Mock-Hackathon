@@ -1,4 +1,6 @@
 const registrationService = require("../services/registration.service");
+const RegistrationModel = require('../models/registration.model');
+const badgeService = require('../services/badge.service');
 
 
 // REGISTER FOR ACTIVITY
@@ -54,7 +56,32 @@ const registerForActivity = async (req, res) => {
     }
 };
 
+const markAttendance = async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body; // 'attended' or 'no-show'
+
+    if (!['attended', 'no-show'].includes(status)) {
+        return res.status(400).json({ message: "status must be 'attended' or 'no-show'" });
+    }
+
+    const registration = await RegistrationModel.findByIdAndUpdate(
+        id,
+        { status, attendedAt: status === 'attended' ? new Date() : undefined },
+        { new: true }
+    );
+
+    if (!registration) return res.status(404).json({ message: 'Registration not found' });
+
+    let newBadges = [];
+    if (status === 'attended') {
+        newBadges = await badgeService.checkAndAward(registration.user);
+    }
+
+    res.json({ registration, newBadges });
+};
+
 
 module.exports = {
-    registerForActivity
+    registerForActivity,
+    markAttendance
 };
