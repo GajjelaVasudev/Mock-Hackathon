@@ -25,31 +25,75 @@ class Activity:
     description: str = ""
     species: List[str] = field(default_factory=list)
     type: str = "walk"  # "walk", "camp", "course", "volunteer"
+    title: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    image: Optional[Dict[str, Any]] = None
+    imageUrl: Optional[str] = None
+    date: Optional[str] = None
+    capacity: Optional[int] = None
+    registered_count: Optional[int] = None
+    status: Optional[str] = "upcoming"
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Activity":
+        raw_image = data.get("image")
+        image_dict = None
+        if isinstance(raw_image, dict) and raw_image.get("url"):
+            image_dict = {
+                "url": raw_image.get("url"),
+                "mediumUrl": raw_image.get("mediumUrl") or raw_image.get("url"),
+                "smallUrl": raw_image.get("smallUrl") or raw_image.get("url"),
+                "source": raw_image.get("source", "pexels"),
+                "photographer": raw_image.get("photographer", "Contributor"),
+                "attributionUrl": raw_image.get("attributionUrl", ""),
+                "alt": raw_image.get("alt") or data.get("name") or data.get("title") or "BNHS Nature Activity",
+            }
+        elif data.get("imageUrl"):
+            image_dict = {
+                "url": data.get("imageUrl"),
+                "mediumUrl": data.get("imageUrl"),
+                "smallUrl": data.get("imageUrl"),
+                "source": "custom",
+                "photographer": "BNHS",
+                "attributionUrl": "",
+                "alt": data.get("name") or data.get("title") or "BNHS Nature Activity",
+            }
+
+        name_val = data.get("name") or data.get("title") or ""
+        title_val = data.get("title") or name_val
+
         return cls(
-            id=data.get("id", ""),
-            name=data.get("name", ""),
+            id=str(data.get("id") or data.get("_id") or ""),
+            name=name_val,
+            title=title_val,
             category=data.get("category", "General"),
             location=data.get("location", "Mumbai"),
-            interests=data.get("interests", []) or [],
+            interests=data.get("interests") or data.get("tags") or [],
+            tags=data.get("tags") or data.get("interests") or [],
             difficulty=data.get("difficulty"),
-            audience=data.get("audience", []) or [],
+            audience=data.get("audience") or [],
             duration=data.get("duration"),
             distance=data.get("distance"),
             description=data.get("description", ""),
-            species=data.get("species", []) or [],
+            species=data.get("species") or [],
             type=data.get("type", "walk"),
+            image=image_dict,
+            imageUrl=data.get("imageUrl") or (image_dict.get("url") if image_dict else None),
+            date=str(data.get("date")) if data.get("date") else None,
+            capacity=data.get("capacity"),
+            registered_count=data.get("registeredCount") or data.get("registered_count"),
+            status=data.get("status", "upcoming"),
         )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
+            "title": self.title or self.name,
             "category": self.category,
             "location": self.location,
             "interests": self.interests,
+            "tags": self.tags,
             "difficulty": self.difficulty,
             "audience": self.audience,
             "duration": self.duration,
@@ -57,6 +101,12 @@ class Activity:
             "description": self.description,
             "species": self.species,
             "type": self.type,
+            "image": self.image,
+            "imageUrl": self.imageUrl,
+            "date": self.date,
+            "capacity": self.capacity,
+            "registeredCount": self.registered_count,
+            "status": self.status,
         }
 
 
@@ -76,6 +126,9 @@ class ActivitiesCatalog:
             raw_data = json.load(f)
 
         self.activities = [Activity.from_dict(item) for item in raw_data]
+
+    def __len__(self) -> int:
+        return len(self.activities)
 
     def get_all(self) -> List[Activity]:
         """Returns all loaded activities."""
@@ -100,11 +153,7 @@ class ActivitiesCatalog:
 
         if location:
             loc_lower = location.lower()
-            results = [
-                a for a in results
-                if loc_lower in a.location.lower()
-                or (loc_lower in ("mumbai", "navi mumbai") and a.location.lower() in ("mumbai", "navi mumbai"))
-            ]
+            results = [a for a in results if loc_lower in a.location.lower()]
 
         if activity_type:
             type_lower = activity_type.lower()
@@ -112,13 +161,13 @@ class ActivitiesCatalog:
 
         if difficulty:
             diff_lower = difficulty.lower()
-            results = [a for a in results if a.difficulty and a.difficulty.lower() == diff_lower]
+            results = [
+                a for a in results
+                if a.difficulty and a.difficulty.lower() == diff_lower
+            ]
 
         if category:
             cat_lower = category.lower()
             results = [a for a in results if cat_lower in a.category.lower()]
 
         return results
-
-    def __len__(self) -> int:
-        return len(self.activities)

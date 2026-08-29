@@ -59,15 +59,32 @@ class BNHSRetriever:
         Returns:
             List of retrieved Document objects.
         """
-        k = top_k if top_k is not None else self.top_k
+        k = top_k if top_k is not None else max(self.top_k, 5)
 
         if not query or not query.strip():
             return []
 
+        clean_q = query.strip()
+        
+        # Primary retrieval
         if self.search_type == "mmr" and hasattr(self.vectorstore, "max_marginal_relevance_search"):
-            return self.vectorstore.max_marginal_relevance_search(query, k=k)
+            docs = self.vectorstore.max_marginal_relevance_search(clean_q, k=k)
         else:
-            return self.vectorstore.similarity_search(query, k=k)
+            docs = self.vectorstore.similarity_search(clean_q, k=k)
+
+        # For general or overview questions, perform query expansion to enrich context
+        q_lower = clean_q.lower()
+        if any(term in q_lower for term in ["what is bnhs", "about bnhs", "formed", "founded", "history", "located", "where is"]):
+            expanded_query = "Bombay Natural History Society overview history activities CEC Mumbai"
+            extra_docs = self.vectorstore.similarity_search(expanded_query, k=3)
+            seen_ids = {d.metadata.get("chunk_id", d.page_content[:40]) for d in docs}
+            for d in extra_docs:
+                cid = d.metadata.get("chunk_id", d.page_content[:40])
+                if cid not in seen_ids:
+                    seen_ids.add(cid)
+                    docs.append(d)
+
+        return docs[:max(k, 6)]
 
     def retrieve_with_scores(
         self,

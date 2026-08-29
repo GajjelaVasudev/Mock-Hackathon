@@ -8,7 +8,7 @@ const https = require('https');
 const url = require('url');
 
 const PYTHON_API_URL = (process.env.PYTHON_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
-const DEFAULT_TIMEOUT_MS = parseInt(process.env.AI_SERVICE_TIMEOUT_MS || '15000', 10);
+const DEFAULT_TIMEOUT_MS = parseInt(process.env.AI_SERVICE_TIMEOUT_MS || '60000', 10);
 
 class PythonAIService {
   constructor() {
@@ -171,6 +171,62 @@ class PythonAIService {
     const queryString = params.toString();
     const endpoint = `/api/v1/activities${queryString ? `?${queryString}` : ''}`;
     return this.request(endpoint);
+  }
+
+  /**
+   * Activity Detail by ID
+   */
+  async getActivityById(activityId) {
+    return this.request(`/api/v1/activities/${encodeURIComponent(activityId)}`);
+  }
+
+  /**
+   * User Profile Operations
+   */
+  async getUser(userId) {
+    return this.request(`/api/v1/users/${encodeURIComponent(userId)}`);
+  }
+
+  async createUser(userData) {
+    return this.request('/api/v1/users', {
+      method: 'POST',
+      body: userData,
+    });
+  }
+
+  async updateUser(userId, userData) {
+    return this.request(`/api/v1/users/${encodeURIComponent(userId)}`, {
+      method: 'PUT',
+      body: userData,
+    });
+  }
+
+  /**
+   * Activity Registrations
+   */
+  async getUserRegistrations(userId) {
+    return this.request(`/api/v1/users/${encodeURIComponent(userId)}/registrations`);
+  }
+
+  async createRegistration(registrationData) {
+    return this.request('/api/v1/registrations', {
+      method: 'POST',
+      body: registrationData,
+    });
+  }
+
+  /**
+   * Participation History
+   */
+  async getUserParticipation(userId) {
+    return this.request(`/api/v1/users/${encodeURIComponent(userId)}/participation`);
+  }
+
+  async recordParticipation(userId, participationData) {
+    return this.request(`/api/v1/users/${encodeURIComponent(userId)}/participation`, {
+      method: 'POST',
+      body: participationData,
+    });
   }
 }
 

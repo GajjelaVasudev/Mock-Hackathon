@@ -45,3 +45,20 @@ async def list_activities(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching activities: {str(e)}",
         )
+
+
+@router.get(
+    "/activities/{activity_id}",
+    response_model=Activity,
+    summary="Get BNHS Activity by ID",
+    description="Retrieves full structured details for an activity by its slug ID or MongoDB identifier.",
+)
+async def get_activity_detail(activity_id: str) -> Activity:
+    """Returns single activity matching the provided identifier."""
+    activity_dict = rec_service.get_activity_by_id(activity_id)
+    if not activity_dict:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Activity with ID '{activity_id}' not found.",
+        )
+    return Activity(**activity_dict)

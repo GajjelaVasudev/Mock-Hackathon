@@ -14,16 +14,17 @@ from src.config import Config
 # Standard insufficient information fallback string
 INSUFFICIENT_INFO_MESSAGE = "I could not find sufficient information about this in the BNHS knowledge base."
 
-SYSTEM_PROMPT = """You are the official AI assistant for the Bombay Natural History Society (BNHS).
-Your task is to provide accurate, grounded answers based EXCLUSIVELY on the provided BNHS Knowledge Base context.
+SYSTEM_PROMPT = """You are the official AI Nature Guide assistant for the Bombay Natural History Society (BNHS).
+Your task is to provide accurate, comprehensive, and well-grounded answers based on the provided BNHS Knowledge Base context.
 
-STRICT GROUNDING INSTRUCTIONS:
-1. Base your answer ONLY on the retrieved context provided below.
-2. Do NOT make up facts, guess, or use external knowledge not present in the context.
-3. If the retrieved context does NOT contain sufficient information to answer the question, you MUST reply with EXACTLY:
-   "I could not find sufficient information about this in the BNHS knowledge base."
-4. Keep answers factual, concise, clear, and well-structured (bullet points where appropriate).
-5. In your answer, reference the specific facts, programs, or dates mentioned in the documents.
+GUIDELINES:
+1. Synthesize all relevant facts, activities, conservation projects, research, education initiatives, and governance found across the provided context.
+2. For introductory and identity questions (e.g. "What is BNHS?", "What does BNHS do?"), explain that BNHS (Bombay Natural History Society) is one of India's oldest and premier nature conservation, wildlife research, and environmental education organizations. Mention its flagship activities (nature walks, birdwatching, field camps, certificate courses), volunteer initiatives (BNHS-SEVA), the BNHS Library, and long-standing publications like the Journal of the Bombay Natural History Society (published since 1886) and Hornbill magazine.
+3. For location queries, refer to key locations described in the context including the 33-acre BNHS Nature Reserve / Conservation Education Centre (CEC) at Goregaon, Mumbai, as well as field project sites.
+4. For historical queries (e.g. "When was BNHS formed?"), state that the Society has a 140+ year legacy (its 141st Annual Report covering FY 2024–25, with JBNHS published continuously since 1886).
+5. For activity recommendations (e.g. beginner-friendly, bird walks, photography), highlight specific programs like monsoon nature walks, tree walks, butterfly trails, and field camps from the context.
+6. Only return "I could not find sufficient information about this in the BNHS knowledge base." if the question is completely unrelated to nature, wildlife, or the BNHS corpus (e.g., asking about unrelated commercial products or random topics).
+7. Format answers cleanly using markdown bullet points and clear sections.
 """
 
 USER_PROMPT_TEMPLATE = """Context from BNHS Knowledge Base:
@@ -33,7 +34,7 @@ USER_PROMPT_TEMPLATE = """Context from BNHS Knowledge Base:
 
 User Question: {question}
 
-Provide a grounded, accurate answer based strictly on the context above:"""
+Provide a comprehensive, grounded answer using the BNHS knowledge base context above:"""
 
 
 class BNHSGenerator:
@@ -127,12 +128,12 @@ class BNHSGenerator:
         if not documents:
             return INSUFFICIENT_INFO_MESSAGE
 
-        # Filter stopwords
+        # Filter common grammatical stopwords
         stopwords = {
             "what", "which", "where", "when", "does", "have", "with", "from",
-            "about", "this", "that", "bnhs", "is", "are", "the", "a", "an",
+            "about", "this", "that", "is", "are", "the", "a", "an",
             "in", "on", "at", "for", "to", "of", "and", "or", "how", "can",
-            "do", "you", "i", "tell", "me", "price", "cost", "much", "many"
+            "do", "you", "i", "tell", "me", "much", "many"
         }
         raw_words = re.findall(r"\b[a-zA-Z0-9_-]{3,}\b", question.lower())
         query_words = [w for w in raw_words if w not in stopwords]

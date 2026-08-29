@@ -38,6 +38,8 @@ async def get_recommendations(
                     duration=item.get("duration"),
                     distance=item.get("distance"),
                     description=item.get("description"),
+                    image=item.get("image"),
+                    imageUrl=item.get("imageUrl"),
                     score=item.get("score", 0.0),
                     reasons=item.get("reasons", []),
                 )

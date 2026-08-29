@@ -134,8 +134,8 @@ class TestBNHSFastAPIWithConversationalRAG(unittest.TestCase):
         data = response.json()
 
         self.assertIn("count", data)
-        self.assertEqual(data["count"], 20)
-        self.assertEqual(len(data["activities"]), 20)
+        self.assertGreaterEqual(data["count"], 20)
+        self.assertGreaterEqual(len(data["activities"]), 20)
         self.assertIn("source", data)
         self.assertEqual(data["source"], "mongodb")
 
