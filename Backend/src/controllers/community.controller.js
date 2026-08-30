@@ -7,6 +7,14 @@ const Registration = require('../models/registration.model');
 const Activity = require('../models/activity.model');
 const User = require('../models/user.model');
 
+const {
+  CANONICAL_CATEGORIES,
+  normalizeHashtag,
+  extractAndNormalizeHashtags,
+  normalizeCategoryName,
+  determinePostCategory,
+} = require('../utils/communityTaxonomy');
+
 // Helper to resolve activity by ObjectId or string id
 async function findActivity(activityId) {
   if (!activityId) return null;
@@ -36,28 +44,82 @@ class CommunityController {
    */
   async getFeed(req, res) {
     try {
-      const { category, theme, sort = 'recent', page = 1, limit = 20, search } = req.query;
+      const { category, theme, hashtag, myPosts, saved, sort = 'recent', page = 1, limit = 20, search } = req.query;
       const currentUserId = req.user ? (req.user.id || req.user._id) : null;
 
+      // Fetch saved post IDs if user is logged in
+      let savedPostIds = [];
+      if (currentUserId) {
+        const currentUser = await User.findById(currentUserId).select('savedPosts');
+        if (currentUser && currentUser.savedPosts) {
+          savedPostIds = currentUser.savedPosts;
+        }
+      }
+
+      // Base query: only active posts
       const queryConditions = { status: 'active' };
 
+      // Filter by My Posts
+      if (myPosts === 'true') {
+        if (!currentUserId) {
+          return res.status(200).json({
+            total: 0,
+            page: 1,
+            totalPages: 1,
+            posts: []
+          });
+        }
+        queryConditions.user = currentUserId;
+      }
+
+      // Filter by Saved Posts
+      if (saved === 'true') {
+        if (!currentUserId || savedPostIds.length === 0) {
+          return res.status(200).json({
+            total: 0,
+            page: 1,
+            totalPages: 1,
+            posts: []
+          });
+        }
+        queryConditions._id = { $in: savedPostIds };
+      }
+
+      // Exact Canonical Category Matching
       if (category && category !== 'all' && category !== 'All') {
+        const canonicalCat = normalizeCategoryName(category) || category.trim();
         queryConditions.$or = [
-          { activityCategory: new RegExp(category, 'i') },
-          { activityType: new RegExp(category, 'i') },
-          { content: new RegExp(category, 'i') }
+          { category: canonicalCat },
+          { activityCategory: canonicalCat }
+        ];
+      }
+
+      // Independent Hashtag Filtering (CATEGORY != HASHTAG)
+      if (hashtag && hashtag.trim()) {
+        const cleanTag = normalizeHashtag(hashtag); // e.g. "#flora"
+        const rawTag = cleanTag.replace(/^#/, '');  // e.g. "flora"
+        queryConditions.$or = [
+          { hashtags: cleanTag },
+          { hashtags: rawTag },
+          { content: new RegExp('#' + rawTag + '(?![a-zA-Z0-9_-])', 'i') }
         ];
       }
 
       if (theme) {
-        queryConditions.activityCategory = new RegExp(theme, 'i');
+        const canonicalTheme = normalizeCategoryName(theme) || theme.trim();
+        queryConditions.$or = [
+          { category: canonicalTheme },
+          { activityCategory: canonicalTheme }
+        ];
       }
 
       if (search && search.trim()) {
+        const searchRegex = new RegExp(search.trim(), 'i');
         queryConditions.$or = [
-          { content: new RegExp(search.trim(), 'i') },
-          { activityName: new RegExp(search.trim(), 'i') },
-          { userName: new RegExp(search.trim(), 'i') }
+          { content: searchRegex },
+          { activityName: searchRegex },
+          { userName: searchRegex },
+          { hashtags: searchRegex }
         ];
       }
 
@@ -71,14 +133,30 @@ class CommunityController {
       const skip = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
       const take = Math.min(50, parseInt(limit, 10));
 
-      const [posts, total] = await Promise.all([
+      const [posts, total, allActivePosts] = await Promise.all([
         ExperiencePost.find(queryConditions)
           .sort(sortOptions)
           .skip(skip)
           .limit(take)
           .populate('user', 'name username role avatar'),
-        ExperiencePost.countDocuments(queryConditions)
+        ExperiencePost.countDocuments(queryConditions),
+        ExperiencePost.find({ status: 'active' }, { content: 1, hashtags: 1, category: 1 }).lean()
       ]);
+
+      // Calculate genuine, real-time hashtag frequencies from actual active MongoDB posts
+      const tagFrequencyMap = {};
+      allActivePosts.forEach(p => {
+        const postTags = extractAndNormalizeHashtags(p.content, p.hashtags || []);
+        postTags.forEach(tag => {
+          const raw = tag.replace(/^#/, '');
+          tagFrequencyMap[raw] = (tagFrequencyMap[raw] || 0) + 1;
+        });
+      });
+
+      // Format dynamic hashtags list sorted by count
+      const dynamicHashtags = Object.entries(tagFrequencyMap)
+        .sort((a, b) => b[1] - a[1])
+        .map(([tag, count]) => ({ tag, count }));
 
       const formattedPosts = posts.map(post => {
         const p = post.toObject();
@@ -86,10 +164,15 @@ class CommunityController {
           ? p.reactions?.find(r => r.user?.toString() === currentUserId.toString())
           : null;
 
+        const isSaved = currentUserId
+          ? savedPostIds.some(s => s.toString() === p._id.toString())
+          : false;
+
         return {
           ...p,
           isLiked: !!userReaction,
           userReactionType: userReaction?.type || null,
+          isSaved,
           isOwner: currentUserId ? p.user?._id?.toString() === currentUserId.toString() || p.user?.toString() === currentUserId.toString() : false
         };
       });
@@ -98,11 +181,48 @@ class CommunityController {
         total,
         page: parseInt(page, 10),
         totalPages: Math.ceil(total / take),
+        hashtags: dynamicHashtags,
         posts: formattedPosts
       });
     } catch (error) {
       console.error('getFeed error:', error);
       return res.status(500).json({ message: 'Failed to fetch community feed' });
+    }
+  }
+
+  /**
+   * Toggle Bookmark / Save Post
+   */
+  async toggleSavePost(req, res) {
+    try {
+      const userId = req.user.id || req.user._id;
+      const { id } = req.params;
+
+      const user = await User.findById(userId);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+
+      const savedList = (user.savedPosts || []).map(s => s.toString());
+      const idStr = id.toString();
+      const isSaved = savedList.includes(idStr);
+
+      if (isSaved) {
+        await User.findByIdAndUpdate(userId, {
+          $pull: { savedPosts: id }
+        });
+      } else {
+        await User.findByIdAndUpdate(userId, {
+          $addToSet: { savedPosts: id }
+        });
+      }
+
+      return res.status(200).json({
+        isSaved: !isSaved,
+        savedCount: isSaved ? Math.max(0, savedList.length - 1) : savedList.length + 1,
+        message: !isSaved ? 'Post saved to your bookmarks' : 'Post removed from saved'
+      });
+    } catch (err) {
+      console.error('toggleSavePost error:', err);
+      return res.status(500).json({ message: 'Failed to toggle save post' });
     }
   }
 
@@ -177,70 +297,73 @@ class CommunityController {
   }
 
   /**
-   * 3. Create Experience Post (Strict Attendance Verification)
+   * 3. Create Experience Post (Open to all authenticated naturalists)
    */
   async createExperiencePost(req, res) {
     try {
       const userId = req.user.id || req.user._id;
       const userRole = req.user.role || 'user';
       const userName = req.user.name || req.user.username || 'BNHS Naturalist';
-      const { activityId, content, imageUrls = [] } = req.body;
+      const { activityId, category, content, imageUrls = [] } = req.body;
 
       if (!content || !content.trim()) {
         return res.status(400).json({ message: 'Experience content is required' });
       }
 
-      if (!activityId) {
-        return res.status(400).json({ message: 'Please select an activity you attended' });
-      }
+      // 1. Resolve activity if provided (Optional)
+      let activity = null;
+      let isAttendedVerified = false;
 
-      // 1. Verify Activity exists
-      const activity = await findActivity(activityId);
-      if (!activity) {
-        return res.status(404).json({ message: 'Activity not found' });
-      }
-
-      // 2. Strict Attendance Validation (Security check)
-      let isAttended = false;
-      if (userRole === 'admin' || userRole === 'staff') {
-        isAttended = true; // Staff/Admin verified
-      } else {
-        const attendanceRecord = await Registration.findOne({
-          user: userId,
-          activity: activity._id,
-          status: 'attended'
-        });
-        if (attendanceRecord) {
-          isAttended = true;
+      if (activityId) {
+        activity = await findActivity(activityId);
+        if (activity) {
+          // Check if user attended this activity for verified badge
+          if (userRole === 'admin' || userRole === 'staff') {
+            isAttendedVerified = true;
+          } else {
+            const attendanceRecord = await Registration.findOne({
+              user: userId,
+              activity: activity._id,
+              status: 'attended'
+            });
+            if (attendanceRecord) {
+              isAttendedVerified = true;
+            }
+          }
         }
       }
 
-      if (!isAttended) {
-        return res.status(403).json({
-          message: 'You can only share experiences for activities you have actually attended.'
-        });
-      }
-
-      // 3. Process uploaded files if passed via multer
+      // 2. Process uploaded files if passed via multer
       let finalImageUrls = Array.isArray(imageUrls) ? [...imageUrls] : [];
       if (req.files && Array.isArray(req.files) && req.files.length > 0) {
         const uploadedPaths = req.files.map(f => `/uploads/${f.filename}`);
         finalImageUrls = [...finalImageUrls, ...uploadedPaths];
       }
 
+      // 3. Normalize hashtags and determine canonical category
+      const normalizedTags = extractAndNormalizeHashtags(content, req.body.hashtags || []);
+      const canonicalCategory = determinePostCategory({
+        explicitCategory: category,
+        content: content.trim(),
+        hashtags: normalizedTags,
+        activityCategory: activity ? activity.category : null,
+      });
+
       // 4. Create Post
       const post = await ExperiencePost.create({
         user: userId,
         userName,
         userRole,
-        activity: activity._id,
-        activityIdString: activity.id || activity._id.toString(),
-        activityName: activity.name || activity.title,
-        activityDate: formatDate(activity.date),
-        activityLocation: activity.location,
-        activityCategory: activity.category || 'Nature Activities',
-        activityType: activity.type || 'walk',
-        isAttendedVerified: true,
+        activity: activity ? activity._id : null,
+        activityIdString: activity ? (activity.id || activity._id.toString()) : null,
+        activityName: activity ? (activity.name || activity.title) : 'Nature Field Observation',
+        activityDate: activity ? formatDate(activity.date) : formatDate(new Date()),
+        activityLocation: activity ? activity.location : 'BNHS Habitat Field Site',
+        category: canonicalCategory,
+        hashtags: normalizedTags,
+        activityCategory: canonicalCategory,
+        activityType: activity ? (activity.type || 'walk') : 'observation',
+        isAttendedVerified,
         content: content.trim(),
         imageUrls: finalImageUrls,
         reactions: [],

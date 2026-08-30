@@ -14,6 +14,7 @@ router.post('/experiences', upload.array('images', 5), communityController.creat
 router.get('/experiences/:id', communityController.getExperiencePostById);
 router.post('/experiences/:id/comments', communityController.addComment);
 router.post('/experiences/:id/reactions', communityController.toggleReaction);
+router.post('/experiences/:id/save', communityController.toggleSavePost);
 router.delete('/experiences/:id', communityController.deleteExperiencePost);
 router.get('/my-experiences', communityController.getMyExperiences);
 

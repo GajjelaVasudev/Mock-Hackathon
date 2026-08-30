@@ -35,6 +35,9 @@ import {
   CommunityReport,
   MyConversation,
   ActivityImage,
+  NatureAchievementSummary,
+  AdminAchievementItem,
+  CertificateDetails,
 } from '../types';
 
 const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
@@ -477,14 +480,20 @@ class ApiService {
   async getCommunityFeed(params?: {
     category?: string;
     theme?: string;
+    hashtag?: string;
+    myPosts?: boolean;
+    saved?: boolean;
     sort?: string;
     page?: number;
     limit?: number;
     search?: string;
-  }): Promise<{ total: number; page: number; totalPages: number; posts: ExperiencePost[] }> {
+  }): Promise<{ total: number; page: number; totalPages: number; hashtags?: { tag: string; count: number }[]; posts: ExperiencePost[] }> {
     const query = new URLSearchParams();
     if (params?.category) query.append('category', params.category);
     if (params?.theme) query.append('theme', params.theme);
+    if (params?.hashtag) query.append('hashtag', params.hashtag);
+    if (params?.myPosts) query.append('myPosts', 'true');
+    if (params?.saved) query.append('saved', 'true');
     if (params?.sort) query.append('sort', params.sort);
     if (params?.page) query.append('page', String(params.page));
     if (params?.limit) query.append('limit', String(params.limit));
@@ -499,7 +508,8 @@ class ApiService {
   }
 
   async createExperiencePost(payload: {
-    activityId: string;
+    activityId?: string;
+    category?: string;
     content: string;
     imageUrls?: string[];
   }): Promise<{ message: string; post: ExperiencePost }> {
@@ -524,6 +534,12 @@ class ApiService {
     return this.request(`/api/community/experiences/${encodeURIComponent(postId)}/reactions`, {
       method: 'POST',
       body: JSON.stringify({ type }),
+    });
+  }
+
+  async toggleSaveExperiencePost(postId: string): Promise<{ isSaved: boolean; savedCount: number; message: string }> {
+    return this.request(`/api/community/experiences/${encodeURIComponent(postId)}/save`, {
+      method: 'POST',
     });
   }
 
@@ -642,6 +658,51 @@ class ApiService {
   }): Promise<{ message: string; report: CommunityReport }> {
     return this.request(`/api/community/admin/reports/${encodeURIComponent(reportId)}/resolve`, {
       method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // ==========================================
+  // 11. Nature Achievement & Recognition
+  // ==========================================
+
+  async getUserAchievements(): Promise<NatureAchievementSummary> {
+    return this.request<NatureAchievementSummary>('/api/user/achievements');
+  }
+
+  async getUserAttendanceSummary(): Promise<{ verifiedAttendanceCount: number; activities: any[] }> {
+    return this.request('/api/user/attendance-summary');
+  }
+
+  async getCertificateDetails(certId: string): Promise<CertificateDetails> {
+    return this.request<CertificateDetails>(`/api/user/achievements/certificate/${encodeURIComponent(certId)}`);
+  }
+
+  async getAdminAchievements(params: {
+    page?: number;
+    limit?: number;
+    tier?: string;
+    status?: string;
+  } = {}): Promise<{ total: number; page: number; totalPages: number; achievements: AdminAchievementItem[] }> {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', String(params.page));
+    if (params.limit) query.append('limit', String(params.limit));
+    if (params.tier && params.tier !== 'all') query.append('tier', params.tier);
+    if (params.status && params.status !== 'all') query.append('status', params.status);
+
+    const qs = query.toString();
+    return this.request(`/api/admin/achievements${qs ? `?${qs}` : ''}`);
+  }
+
+  async updateAchievementFulfillment(
+    achievementId: string,
+    payload: {
+      fulfillmentStatus: string;
+      fulfillmentNotes?: string;
+    }
+  ): Promise<{ message: string; achievement: AdminAchievementItem }> {
+    return this.request(`/api/admin/achievements/${encodeURIComponent(achievementId)}/fulfillment`, {
+      method: 'PATCH',
       body: JSON.stringify(payload),
     });
   }

@@ -1,26 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Sparkles,
-  Camera,
+  Home,
+  User,
+  Bookmark,
   MessageSquare,
-  Filter,
-  Plus,
-  Compass,
-  Heart,
-  TrendingUp,
-  Clock,
+  Bell,
+  Shield,
   ShieldCheck,
-  Search,
-  BookOpen,
-  Calendar,
-  MapPin,
+  Plus,
   ArrowRight,
-  ShieldAlert,
+  LayoutGrid,
+  List,
+  Sparkles,
+  ChevronDown,
   Loader2,
-  MessagesSquare,
+  Camera,
+  Heart,
+  Tag,
 } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { ExperiencePost, Activity } from '../types';
+import { useSearchParams } from 'react-router-dom';
+import { ExperiencePost } from '../types';
 import { ExperienceCard } from '../components/community/ExperienceCard';
 import { ShareExperienceModal } from '../components/community/ShareExperienceModal';
 import { ImageLightbox } from '../components/community/ImageLightbox';
@@ -29,41 +28,64 @@ import { AdminModerationPanel } from '../components/community/AdminModerationPan
 import { MyConversations } from '../components/community/MyConversations';
 import { useUser } from '../context/UserContext';
 import { getMediaUrl } from '../utils/media';
+import { CATEGORY_PILLS, normalizeHashtag } from '../utils/communityTaxonomy';
 import api from '../services/api';
 
-const FILTER_CATEGORIES = [
-  { id: 'all', label: 'All Experiences' },
-  { id: 'bird', label: 'Birds' },
-  { id: 'marine', label: 'Marine' },
-  { id: 'tree', label: 'Trees & Flora' },
-  { id: 'camp', label: 'Field Camps' },
-  { id: 'conservation', label: 'Conservation' },
-  { id: 'volunteer', label: 'Volunteering' },
-];
+type NavSection = 'all' | 'my_posts' | 'saved' | 'conversations' | 'mentions' | 'moderation';
 
 export const CommunityPage: React.FC = () => {
   const { currentUser } = useUser();
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'staff';
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Tab State: 'feed' | 'conversations' | 'moderation'
-  const initialTab = (searchParams.get('tab') as any) || localStorage.getItem('bnhs_community_tab') || 'feed';
-  const [activeTab, setActiveTab] = useState<'feed' | 'conversations' | 'moderation'>(
-    initialTab === 'conversations' || initialTab === 'moderation' ? initialTab : 'feed'
+  // Navigation State from URL
+  const initialNav = (searchParams.get('tab') as NavSection) || 'all';
+  const [activeNav, setActiveNav] = useState<NavSection>(
+    ['all', 'my_posts', 'saved', 'conversations', 'mentions', 'moderation'].includes(initialNav)
+      ? initialNav
+      : 'all'
   );
 
+  const initialCategory = searchParams.get('category') || 'all';
+  const initialHashtag = searchParams.get('hashtag') || null;
+
   const [posts, setPosts] = useState<ExperiencePost[]>([]);
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [hashtags, setHashtags] = useState<{ tag: string; count: number }[]>([]);
+  const [activeCategory, setActiveCategory] = useState(initialCategory);
+  const [activeHashtag, setActiveHashtag] = useState<string | null>(initialHashtag);
   const [activeSort, setActiveSort] = useState<'recent' | 'most_liked' | 'most_discussed'>('recent');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isLoading, setIsLoading] = useState(true);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [myExperiences, setMyExperiences] = useState<ExperiencePost[]>([]);
-  const [upcomingActivities, setUpcomingActivities] = useState<Activity[]>([]);
+
+  // Helper to sync URL search params cleanly
+  const updateUrlParams = (newTab?: NavSection, newCat?: string, newTag?: string | null) => {
+    const tab = newTab !== undefined ? newTab : activeNav;
+    const cat = newCat !== undefined ? newCat : activeCategory;
+    const tag = newTag !== undefined ? newTag : activeHashtag;
+
+    const params: Record<string, string> = {};
+    if (tab && tab !== 'all') params.tab = tab;
+    if (cat && cat !== 'all') params.category = cat;
+    if (tag) params.hashtag = tag.replace(/^#/, '');
+
+    setSearchParams(params, { replace: true });
+  };
+
+  // Sync state if URL searchParams changes externally (e.g. browser back/forward)
+  useEffect(() => {
+    const urlTab = (searchParams.get('tab') as NavSection) || 'all';
+    const urlCat = searchParams.get('category') || 'all';
+    const urlTag = searchParams.get('hashtag') || null;
+
+    if (['all', 'my_posts', 'saved', 'conversations', 'mentions', 'moderation'].includes(urlTab)) {
+      setActiveNav(urlTab);
+    }
+    setActiveCategory(urlCat);
+    setActiveHashtag(urlTag);
+  }, [searchParams]);
 
   // Unread badge counts from My Conversations
-  const [conversationsCount, setConversationsCount] = useState(0);
   const [unreadTotal, setUnreadTotal] = useState(0);
 
   // Lightbox State
@@ -74,74 +96,67 @@ export const CommunityPage: React.FC = () => {
   // Report Modal State
   const [reportTarget, setReportTarget] = useState<{ id: string; authorName: string } | null>(null);
 
-  const handleTabChange = (tab: 'feed' | 'conversations' | 'moderation') => {
-    setActiveTab(tab);
-    localStorage.setItem('bnhs_community_tab', tab);
-    setSearchParams({ tab });
+  // Guidelines Modal State
+  const [showGuidelines, setShowGuidelines] = useState(false);
+
+  const handleNavChange = (nav: NavSection) => {
+    setActiveNav(nav);
+    updateUrlParams(nav, activeCategory, activeHashtag);
   };
 
-  const fetchFeed = useCallback(async (resetPage = false) => {
+  const handleCategorySelect = (catId: string) => {
+    setActiveCategory(catId);
+    setActiveHashtag(null); // Category selection resets specific hashtag filter
+    updateUrlParams(activeNav, catId, null);
+  };
+
+  const handleHashtagClick = (tag: string) => {
+    const cleanTag = tag.replace(/^#/, '');
+    setActiveHashtag(cleanTag);
+    setActiveCategory('all'); // Hashtag clicking sets independent hashtag filter
+    updateUrlParams('all', 'all', cleanTag);
+  };
+
+  const fetchFeed = useCallback(async () => {
+    if (activeNav === 'conversations' || activeNav === 'moderation') {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const targetPage = resetPage ? 1 : page;
       const res = await api.getCommunityFeed({
         category: activeCategory !== 'all' ? activeCategory : undefined,
+        hashtag: activeHashtag || undefined,
+        myPosts: activeNav === 'my_posts',
+        saved: activeNav === 'saved',
         sort: activeSort,
-        page: targetPage,
-        limit: 15,
-        search: searchQuery.trim() || undefined,
+        limit: 30,
       });
 
-      if (resetPage || targetPage === 1) {
-        setPosts(res.posts || []);
-      } else {
-        setPosts((prev) => [...prev, ...(res.posts || [])]);
+      setPosts(res.posts || []);
+      if (res.hashtags && Array.isArray(res.hashtags)) {
+        setHashtags(res.hashtags);
       }
-      setTotalPages(res.totalPages || 1);
-      if (resetPage) setPage(1);
     } catch (err) {
       console.error('Failed to fetch community feed:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [activeCategory, activeSort, searchQuery, page]);
+  }, [activeCategory, activeHashtag, activeNav, activeSort]);
 
   useEffect(() => {
-    if (activeTab === 'feed') {
-      fetchFeed(true);
-    }
-  }, [activeCategory, activeSort, activeTab]);
-
-  useEffect(() => {
-    fetchSidebarData();
-  }, []);
-
-  const fetchSidebarData = async () => {
-    try {
-      const [myExpRes, actRes] = await Promise.all([
-        api.getMyExperiences().catch(() => ({ posts: [] })),
-        api.getActivities().catch(() => ({ activities: [] })),
-      ]);
-      setMyExperiences(myExpRes.posts || []);
-      setUpcomingActivities((actRes.activities || []).slice(0, 4));
-    } catch (err) {
-      console.error('Sidebar fetch error:', err);
-    }
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchFeed(true);
-  };
+    fetchFeed();
+  }, [fetchFeed]);
 
   const handlePostCreated = (newPost: ExperiencePost) => {
     setPosts((prev) => [newPost, ...prev]);
-    setMyExperiences((prev) => [newPost, ...prev]);
+    setIsShareModalOpen(false);
+    fetchFeed(); // Refresh counts and feed
   };
 
   const handlePostDeleted = (postId: string) => {
     setPosts((prev) => prev.filter((p) => (p._id || p.id) !== postId));
-    setMyExperiences((prev) => prev.filter((p) => (p._id || p.id) !== postId));
   };
 
   const handleOpenLightbox = (images: string[], index: number) => {
@@ -156,322 +171,618 @@ export const CommunityPage: React.FC = () => {
   };
 
   return (
-    <div className="container" style={{ padding: '24px 20px 48px', maxWidth: '1120px' }}>
-      {/* Header Banner */}
+    <div
+      style={{
+        maxWidth: '1440px',
+        margin: '0 auto',
+        padding: '24px 28px 80px',
+        minHeight: 'calc(100vh - 80px)',
+        backgroundColor: '#fafbfc',
+      }}
+    >
       <div
         style={{
-          background: 'linear-gradient(135deg, #064e3b 0%, #047857 60%, #059669 100%)',
-          borderRadius: '20px',
-          padding: '32px 28px',
-          color: '#ffffff',
-          marginBottom: '24px',
-          boxShadow: '0 10px 25px -5px rgba(6, 78, 59, 0.25)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '20px',
+          display: 'grid',
+          gridTemplateColumns: '240px minmax(0, 1fr)',
+          gap: '36px',
+          alignItems: 'start',
         }}
       >
-        <div style={{ maxWidth: '640px' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              padding: '4px 10px',
-              borderRadius: '9999px',
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '10px',
-            }}
-          >
-            <Sparkles size={13} /> Activity-Verified Nature Community
-          </div>
-
-          <h1 style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0 0 8px', letterSpacing: '-0.02em', color: '#ffffff' }}>
-            🌿 BNHS Community
-          </h1>
-
-          <p style={{ fontSize: '0.95rem', color: '#d1fae5', margin: 0, lineHeight: 1.5 }}>
-            Connect with fellow naturalists, share verified field observations from activities you attended, upload photographs, and participate in WhatsApp-style activity discussions.
-          </p>
-        </div>
-
-        {/* Share Experience CTA Button */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setIsShareModalOpen(true)}
-            style={{
-              backgroundColor: '#ffffff',
-              color: '#064e3b',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '12px 22px',
-              fontSize: '0.92rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              transition: 'transform 0.15s ease',
-            }}
-          >
-            <Camera size={18} color="#059669" /> + Share Experience
-          </button>
-        </div>
-      </div>
-
-      {/* Main Tab Navigation Bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '22px',
-          borderBottom: '1px solid #e2e8f0',
-          paddingBottom: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => handleTabChange('feed')}
+        {/* ======================================================== */}
+        {/* 1. LEFT SIDEBAR                                         */}
+        {/* ======================================================== */}
+        <aside
           style={{
-            padding: '9px 18px',
-            borderRadius: '10px',
-            border: 'none',
-            backgroundColor: activeTab === 'feed' ? '#047857' : '#f1f5f9',
-            color: activeTab === 'feed' ? '#ffffff' : '#475569',
-            fontWeight: 800,
-            fontSize: '0.88rem',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease',
-            boxShadow: activeTab === 'feed' ? '0 2px 6px rgba(4, 120, 87, 0.25)' : 'none',
+            position: 'sticky',
+            top: '88px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
           }}
         >
-          <Compass size={16} /> Community Feed
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange('conversations')}
-          style={{
-            padding: '9px 18px',
-            borderRadius: '10px',
-            border: 'none',
-            backgroundColor: activeTab === 'conversations' ? '#047857' : '#f1f5f9',
-            color: activeTab === 'conversations' ? '#ffffff' : '#475569',
-            fontWeight: 800,
-            fontSize: '0.88rem',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease',
-            boxShadow: activeTab === 'conversations' ? '0 2px 6px rgba(4, 120, 87, 0.25)' : 'none',
-          }}
-        >
-          <MessagesSquare size={16} /> My Conversations
-          {unreadTotal > 0 && (
-            <span
-              style={{
-                backgroundColor: activeTab === 'conversations' ? '#ffffff' : '#059669',
-                color: activeTab === 'conversations' ? '#047857' : '#ffffff',
-                borderRadius: '12px',
-                padding: '1px 6px',
-                fontSize: '0.72rem',
-                fontWeight: 800,
-              }}
-            >
-              {unreadTotal}
-            </span>
-          )}
-        </button>
-
-        {currentUser?.role === 'admin' && (
-          <button
-            type="button"
-            onClick={() => handleTabChange('moderation')}
-            style={{
-              padding: '9px 18px',
-              borderRadius: '10px',
-              border: 'none',
-              backgroundColor: activeTab === 'moderation' ? '#dc2626' : '#fee2e2',
-              color: activeTab === 'moderation' ? '#ffffff' : '#991b1b',
-              fontWeight: 800,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s ease',
-              marginLeft: 'auto',
-            }}
-          >
-            <ShieldAlert size={16} /> Content Moderation
-          </button>
-        )}
-      </div>
-
-      {/* Tab 1: Moderation Panel (Admin) */}
-      {activeTab === 'moderation' && currentUser?.role === 'admin' ? (
-        <AdminModerationPanel />
-      ) : activeTab === 'conversations' ? (
-        /* Tab 2: My Conversations (WhatsApp-style chats list) */
-        <MyConversations
-          onCountChange={(count, unread) => {
-            setConversationsCount(count);
-            setUnreadTotal(unread);
-          }}
-        />
-      ) : (
-        /* Tab 3: Community Feed (Default) */
-        <>
-          {/* Filter Bar & Sorting */}
+          {/* Main Community Nav Items */}
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '12px',
-              marginBottom: '22px',
-              paddingBottom: '14px',
-              borderBottom: '1px solid #e2e8f0',
+              flexDirection: 'column',
+              gap: '4px',
+              backgroundColor: '#ffffff',
+              padding: '12px',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             }}
           >
-            {/* Category Pills */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {FILTER_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setActiveCategory(cat.id)}
+            {/* All Posts */}
+            <button
+              onClick={() => handleNavChange('all')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: 'none',
+                backgroundColor: activeNav === 'all' && !activeHashtag ? '#164e63' : 'transparent',
+                color: activeNav === 'all' && !activeHashtag ? '#ffffff' : '#334155',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Home size={18} />
+              <span>All Posts</span>
+            </button>
+
+            {/* My Posts */}
+            <button
+              onClick={() => handleNavChange('my_posts')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: 'none',
+                backgroundColor: activeNav === 'my_posts' ? '#164e63' : 'transparent',
+                color: activeNav === 'my_posts' ? '#ffffff' : '#334155',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <User size={18} />
+              <span>My Posts</span>
+            </button>
+
+            {/* Saved */}
+            <button
+              onClick={() => handleNavChange('saved')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: 'none',
+                backgroundColor: activeNav === 'saved' ? '#164e63' : 'transparent',
+                color: activeNav === 'saved' ? '#ffffff' : '#334155',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Bookmark size={18} />
+              <span>Saved</span>
+            </button>
+
+            {/* My Conversations */}
+            <button
+              onClick={() => handleNavChange('conversations')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: 'none',
+                backgroundColor: activeNav === 'conversations' ? '#164e63' : 'transparent',
+                color: activeNav === 'conversations' ? '#ffffff' : '#334155',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <MessageSquare size={18} />
+                <span>My Conversations</span>
+              </div>
+              {unreadTotal > 0 && (
+                <span
                   style={{
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    border: '1px solid',
-                    borderColor: activeCategory === cat.id ? '#047857' : '#cbd5e1',
-                    backgroundColor: activeCategory === cat.id ? '#047857' : '#ffffff',
-                    color: activeCategory === cat.id ? '#ffffff' : '#475569',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    backgroundColor: '#e11d48',
+                    color: '#ffffff',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    padding: '2px 7px',
+                    borderRadius: '9999px',
                   }}
                 >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
+                  {unreadTotal}
+                </span>
+              )}
+            </button>
 
-            {/* Sort & Search */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <form onSubmit={handleSearchSubmit} style={{ position: 'relative' }}>
-                <Search
-                  size={14}
-                  color="#94a3b8"
-                  style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
-                />
-                <input
-                  type="text"
-                  placeholder="Search field notes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    padding: '6px 12px 6px 30px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.8rem',
-                    outline: 'none',
-                    width: '180px',
-                  }}
-                />
-              </form>
+            {/* Mentions */}
+            <button
+              onClick={() => handleNavChange('mentions')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: 'none',
+                backgroundColor: activeNav === 'mentions' ? '#164e63' : 'transparent',
+                color: activeNav === 'mentions' ? '#ffffff' : '#334155',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Bell size={18} />
+              <span>Mentions</span>
+            </button>
 
-              <select
-                value={activeSort}
-                onChange={(e) => setActiveSort(e.target.value as any)}
+            {/* Admin Moderation Panel (if admin/staff) */}
+            {isAdmin && (
+              <button
+                onClick={() => handleNavChange('moderation')}
                 style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: '#334155',
-                  outline: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: activeNav === 'moderation' ? '#164e63' : 'transparent',
+                  color: activeNav === 'moderation' ? '#ffffff' : '#dc2626',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
                   cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                <option value="recent">Most Recent</option>
-                <option value="most_liked">Most Liked</option>
-                <option value="most_discussed">Most Discussed</option>
-              </select>
+                <ShieldCheck size={18} />
+                <span>Moderation</span>
+              </button>
+            )}
+          </div>
+
+          {/* Explore Hashtags Section */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              padding: '18px 16px',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                color: '#94a3b8',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: '14px',
+              }}
+            >
+              Explore Hashtags
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {hashtags.map((item) => {
+                const isSelected = activeHashtag === item.tag;
+                return (
+                  <button
+                    key={item.tag}
+                    onClick={() => handleHashtagClick(item.tag)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: isSelected ? '#f0fdf4' : 'none',
+                      border: 'none',
+                      padding: '6px 8px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        fontWeight: isSelected ? 800 : 600,
+                        color: isSelected ? '#047857' : '#334155',
+                      }}
+                    >
+                      #{item.tag}
+                    </span>
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 500 }}>
+                      {item.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Feed Content Grid (2 Columns: Posts + Sidebar) */}
+          {/* Community Guidelines Card at Bottom */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) 320px',
-              gap: '28px',
-              alignItems: 'start',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
             }}
           >
-            {/* Left Column: Experience Feed Posts */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {isLoading && page === 1 ? (
-                <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-                  <Loader2 size={32} className="animate-spin" color="#059669" style={{ margin: '0 auto 12px' }} />
-                  <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Loading field observations...</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#047857', fontWeight: 700, fontSize: '0.84rem' }}>
+              <Shield size={16} />
+              <span>Community Guidelines</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4 }}>
+              Help us keep BNHS Community positive, accurate, and respectful of wildlife.
+            </p>
+            <button
+              onClick={() => setShowGuidelines(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: '#047857',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginTop: '4px',
+                textAlign: 'left',
+              }}
+            >
+              Learn More →
+            </button>
+          </div>
+        </aside>
+
+        {/* ======================================================== */}
+        {/* 2. MAIN CONTENT AREA                                    */}
+        {/* ======================================================== */}
+        <main style={{ minWidth: 0 }}>
+          {/* A. If Active Tab is Conversations */}
+          {activeNav === 'conversations' ? (
+            <div>
+              <div style={{ marginBottom: '24px' }}>
+                <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>
+                  My Conversations 💬
+                </h1>
+                <p style={{ color: '#64748b', fontSize: '0.92rem', margin: 0 }}>
+                  Real-time WhatsApp-style chat rooms for activities and field programs you've registered for.
+                </p>
+              </div>
+              <MyConversations />
+            </div>
+          ) : activeNav === 'moderation' ? (
+            /* B. If Active Tab is Moderation */
+            <div>
+              <div style={{ marginBottom: '24px' }}>
+                <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>
+                  Admin Moderation Panel 🛡️
+                </h1>
+                <p style={{ color: '#64748b', fontSize: '0.92rem', margin: 0 }}>
+                  Review reported posts and messages to keep the nature platform safe and authentic.
+                </p>
+              </div>
+              <AdminModerationPanel />
+            </div>
+          ) : (
+            /* C. Main Social Image-First Community Feed */
+            <div>
+              {/* Header Title Row */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '16px',
+                  marginBottom: '20px',
+                }}
+              >
+                <div>
+                  <h1
+                    style={{
+                      fontSize: '2.1rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      margin: '0 0 4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    Community Feed 🌿
+                  </h1>
+                  <p style={{ color: '#64748b', fontSize: '0.92rem', margin: 0 }}>
+                    {activeNav === 'my_posts'
+                      ? 'Your published nature sightings and field experiences'
+                      : activeNav === 'saved'
+                      ? 'Your bookmarked naturalist observations and field notes'
+                      : activeHashtag
+                      ? `Posts tagged #${activeHashtag}`
+                      : 'Share, discover and connect with fellow naturalists'}
+                  </p>
+                </div>
+
+                {/* + Share Experience Button */}
+                <button
+                  onClick={() => setIsShareModalOpen(true)}
+                  style={{
+                    backgroundColor: '#047857',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 20px',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 8px rgba(4, 120, 87, 0.25)',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                >
+                  <Plus size={18} />
+                  <span>Share Experience</span>
+                </button>
+              </div>
+
+              {/* Category Filter Pills & Controls Bar */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  marginBottom: '24px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                {/* Category Pills */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    paddingBottom: '4px',
+                    maxWidth: '100%',
+                  }}
+                >
+                  {CATEGORY_PILLS.map((cat) => {
+                    const isSelected = activeCategory === cat.id && !activeHashtag;
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => handleCategorySelect(cat.id)}
+                        style={{
+                          padding: '7px 16px',
+                          borderRadius: '9999px',
+                          border: isSelected ? '1px solid #164e63' : '1px solid #e2e8f0',
+                          backgroundColor: isSelected ? '#164e63' : '#ffffff',
+                          color: isSelected ? '#ffffff' : '#334155',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Right Sort & View Controls */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                  {/* Sort Dropdown */}
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={activeSort}
+                      onChange={(e) => setActiveSort(e.target.value as any)}
+                      style={{
+                        padding: '7px 28px 7px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        color: '#334155',
+                        cursor: 'pointer',
+                        appearance: 'none',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="recent">Most Recent</option>
+                      <option value="most_liked">Most Liked</option>
+                      <option value="most_discussed">Most Discussed</option>
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      color="#64748b"
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  </div>
+
+                  {/* View Mode Toggle */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '2px',
+                    }}
+                  >
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      style={{
+                        background: viewMode === 'grid' ? '#f1f5f9' : 'none',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '5px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: viewMode === 'grid' ? '#047857' : '#94a3b8',
+                      }}
+                      aria-label="Grid view"
+                    >
+                      <LayoutGrid size={16} />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      style={{
+                        background: viewMode === 'list' ? '#f1f5f9' : 'none',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '5px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: viewMode === 'list' ? '#047857' : '#94a3b8',
+                      }}
+                      aria-label="List view"
+                    >
+                      <List size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Feed Content */}
+              {isLoading ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '80px 0',
+                    color: '#047857',
+                  }}
+                >
+                  <Loader2 size={36} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+                  <p style={{ marginTop: '12px', fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>
+                    Loading community field observations...
+                  </p>
                 </div>
               ) : posts.length === 0 ? (
+                /* Empty Discovery State */
                 <div
                   style={{
                     backgroundColor: '#ffffff',
                     borderRadius: '16px',
-                    border: '1px solid #e2e8f0',
+                    border: '1px dashed #cbd5e1',
                     padding: '48px 24px',
                     textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '12px',
+                    maxWidth: '480px',
+                    margin: '32px auto',
                   }}
                 >
-                  <Compass size={40} color="#94a3b8" style={{ margin: '0 auto 12px' }} />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', margin: '0 0 6px' }}>
-                    No field notes found
-                  </h3>
-                  <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '400px', margin: '0 auto 18px' }}>
-                    Be the first to share your experience from a verified BNHS activity!
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setIsShareModalOpen(true)}
+                  <div
                     style={{
-                      backgroundColor: '#047857',
-                      color: '#ffffff',
-                      padding: '9px 18px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      fontWeight: 700,
-                      fontSize: '0.84rem',
-                      cursor: 'pointer',
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ecfdf5',
+                      color: '#047857',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.4rem',
                     }}
                   >
-                    + Share First Field Note
+                    🌿
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a', fontWeight: 800 }}>
+                    Start the Nature Journal
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
+                    Share your latest bird sighting, wildlife photograph, field observation, or conservation experience.
+                  </p>
+                  <button
+                    onClick={() => setIsShareModalOpen(true)}
+                    style={{
+                      marginTop: '8px',
+                      backgroundColor: '#047857',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 20px',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <Plus size={16} /> Share Your First Experience
                   </button>
                 </div>
               ) : (
-                <>
+                /* The Image-First Posts Grid (Matches the Visual Reference Screenshot!) */
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      viewMode === 'grid'
+                        ? 'repeat(auto-fill, minmax(260px, 1fr))'
+                        : 'minmax(0, 600px)',
+                    gap: '24px',
+                    justifyContent: viewMode === 'list' ? 'center' : 'stretch',
+                  }}
+                >
                   {posts.map((post) => (
                     <ExperienceCard
                       key={post._id || post.id}
@@ -479,237 +790,27 @@ export const CommunityPage: React.FC = () => {
                       onPostDeleted={handlePostDeleted}
                       onOpenLightbox={handleOpenLightbox}
                       onOpenReport={handleOpenReport}
+                      onHashtagClick={handleHashtagClick}
+                      onCategoryClick={handleCategorySelect}
+                      currentUserId={currentUser?.id}
+                      isAdmin={isAdmin}
                     />
                   ))}
-
-                  {/* Load More Button */}
-                  {page < totalPages && (
-                    <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                      <button
-                        type="button"
-                        disabled={isLoading}
-                        onClick={() => {
-                          setPage((prev) => prev + 1);
-                        }}
-                        style={{
-                          padding: '10px 24px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          color: '#047857',
-                          fontWeight: 700,
-                          fontSize: '0.85rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                        }}
-                      >
-                        {isLoading ? 'Loading More...' : 'Load More Experiences'}
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Right Column: Sidebar */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* My Conversations Shortcut Card */}
-              <div
-                style={{
-                  background: 'linear-gradient(135deg, #064e3b 0%, #047857 100%)',
-                  borderRadius: '16px',
-                  padding: '18px',
-                  color: '#ffffff',
-                  boxShadow: '0 4px 12px rgba(6, 78, 59, 0.15)',
-                  cursor: 'pointer',
-                }}
-                onClick={() => handleTabChange('conversations')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MessagesSquare size={20} color="#a7f3d0" />
-                    <h3 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0, color: '#ffffff' }}>
-                      My Conversations
-                    </h3>
-                  </div>
-
-                  {unreadTotal > 0 && (
-                    <span
-                      style={{
-                        backgroundColor: '#ffffff',
-                        color: '#064e3b',
-                        borderRadius: '12px',
-                        padding: '2px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                      }}
-                    >
-                      {unreadTotal} new
-                    </span>
-                  )}
-                </div>
-
-                <p style={{ fontSize: '0.8rem', color: '#d1fae5', margin: '0 0 12px', lineHeight: 1.4 }}>
-                  Continue your discussions with fellow participants and BNHS naturalists.
-                </p>
-
-                <div
-                  style={{
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  Open Conversations <ArrowRight size={14} />
-                </div>
-              </div>
-
-              {/* Activity Group Discussions Card */}
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: '16px',
-                  border: '1px solid #e2e8f0',
-                  padding: '18px',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                  <MessageSquare size={18} color="#059669" />
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#064e3b', margin: 0 }}>
-                    Activity Group Chats
-                  </h3>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {upcomingActivities.map((act) => (
-                    <div
-                      key={act.id || act._id}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: '10px',
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, fontSize: '0.84rem', color: '#1e293b' }}>
-                        {act.name || act.title}
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '10px', fontSize: '0.72rem', color: '#64748b' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <MapPin size={11} color="#059669" /> {act.location}
-                        </span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <Calendar size={11} color="#059669" /> {act.date ? new Date(act.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Upcoming'}
-                        </span>
-                      </div>
-
-                      <Link
-                        to={`/community/activity/${encodeURIComponent(act.id || act._id || '')}`}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          color: '#059669',
-                          textDecoration: 'none',
-                          marginTop: '2px',
-                        }}
-                      >
-                        Join Discussion <ArrowRight size={12} />
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* My Experiences Box */}
-              {myExperiences.length > 0 && (
-                <div
-                  style={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: '16px',
-                    border: '1px solid #e2e8f0',
-                    padding: '18px',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                    <Camera size={16} color="#059669" />
-                    <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#064e3b', margin: 0 }}>
-                      My Experiences ({myExperiences.length})
-                    </h3>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {myExperiences.slice(0, 3).map((myExp) => (
-                      <div
-                        key={myExp._id || myExp.id}
-                        style={{
-                          fontSize: '0.78rem',
-                          padding: '8px 10px',
-                          borderRadius: '8px',
-                          backgroundColor: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: '2px' }}>
-                          {myExp.activityName}
-                        </div>
-                        <div style={{ color: '#64748b', fontSize: '0.72rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {myExp.content}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
-
-              {/* Ethical Nature Guidelines Box */}
-              <div
-                style={{
-                  backgroundColor: '#f0fdf4',
-                  borderRadius: '16px',
-                  border: '1px solid #bbf7d0',
-                  padding: '18px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: '#166534' }}>
-                  <ShieldCheck size={18} />
-                  <h4 style={{ fontSize: '0.88rem', fontWeight: 800, margin: 0 }}>
-                    BNHS Ethical Observation Guidelines
-                  </h4>
-                </div>
-                <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.75rem', color: '#15803d', lineHeight: 1.5 }}>
-                  <li>Maintain respectful distance from wildlife habitats.</li>
-                  <li>Do not use flash photography on nesting birds.</li>
-                  <li>Verify species identification with BNHS guides.</li>
-                  <li>Leave no trace on coastal trails and wetlands.</li>
-                </ul>
-              </div>
             </div>
-          </div>
-        </>
-      )}
+          )}
+        </main>
+      </div>
 
       {/* Share Experience Modal */}
-      {isShareModalOpen && (
-        <ShareExperienceModal
-          isOpen={isShareModalOpen}
-          onClose={() => setIsShareModalOpen(false)}
-          onPostCreated={handlePostCreated}
-        />
-      )}
+      <ShareExperienceModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        onPostCreated={handlePostCreated}
+      />
 
-      {/* Fullscreen Image Lightbox */}
+      {/* Image Lightbox Viewport */}
       {isLightboxOpen && (
         <ImageLightbox
           images={lightboxImages}
@@ -723,12 +824,70 @@ export const CommunityPage: React.FC = () => {
       {/* Report Modal */}
       {reportTarget && (
         <ReportModal
-          isOpen={!!reportTarget}
-          targetId={reportTarget.id}
+          isOpen={true}
           targetType="post"
+          targetId={reportTarget.id}
           targetAuthor={reportTarget.authorName}
           onClose={() => setReportTarget(null)}
         />
+      )}
+
+      {/* Community Guidelines Info Modal */}
+      {showGuidelines && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+          onClick={() => setShowGuidelines(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              padding: '28px',
+              maxWidth: '480px',
+              width: '100%',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', color: '#047857' }}>
+              <Shield size={22} />
+              <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', fontWeight: 800 }}>
+                BNHS Community Guidelines
+              </h3>
+            </div>
+            <ul style={{ paddingLeft: '20px', color: '#334155', fontSize: '0.88rem', lineHeight: 1.6, margin: '0 0 20px' }}>
+              <li><strong>Ethical Birding & Photography:</strong> Keep a safe distance from nests and sensitive wildlife habitats.</li>
+              <li><strong>Authentic Field Observations:</strong> Share genuine observations, date records, and locations.</li>
+              <li><strong>Respectful Interaction:</strong> Keep discussions collaborative, scientific, and encouraging.</li>
+              <li><strong>Verified Activity Attendance:</strong> Experiences linked to BNHS camps and walks carry verified badges.</li>
+            </ul>
+            <button
+              onClick={() => setShowGuidelines(false)}
+              style={{
+                width: '100%',
+                backgroundColor: '#047857',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '10px',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+              }}
+            >
+              Got It
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

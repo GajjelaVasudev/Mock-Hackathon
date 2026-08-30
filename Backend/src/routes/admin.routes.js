@@ -5,12 +5,17 @@ const authenticate = require('../middlewares/auth.middleware');
 const authorize = require('../middlewares/authorize.middleware');
 
 const volunteerController = require('../controllers/volunteer.controller');
+const achievementController = require('../controllers/achievement.controller');
 
 // Protect all admin routes for staff and admin roles
 router.use(authenticate, authorize('admin', 'staff'));
 
 // Platform Overview
 router.get('/overview', adminController.getOverview);
+
+// Achievements & Recognition Management (Staff / Admin)
+router.get('/achievements', achievementController.getAdminAchievements);
+router.patch('/achievements/:id/fulfillment', achievementController.updateFulfillment);
 
 // Eligible Event Leaders (>5 attended events)
 router.get('/eligible-leaders', adminController.getEligibleLeaders);

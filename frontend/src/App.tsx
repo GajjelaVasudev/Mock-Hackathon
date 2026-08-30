@@ -1,10 +1,13 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider } from './context/UserContext';
+import { PWAProvider } from './context/PWAContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { FloatingAIButton } from './components/FloatingAIButton';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { OfflineBanner } from './components/OfflineBanner';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 
 import { HomePage } from './pages/HomePage';
 import { ActivitiesPage } from './pages/ActivitiesPage';
@@ -22,11 +25,13 @@ import { SignupPage } from './pages/SignupPage';
 
 export const App: React.FC = () => {
   return (
-    <UserProvider>
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          <Navbar />
-          <main style={{ flex: 1 }}>
+    <PWAProvider>
+      <UserProvider>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+            <OfflineBanner />
+            <Navbar />
+            <main style={{ flex: 1 }}>
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<HomePage />} />
@@ -124,12 +129,14 @@ export const App: React.FC = () => {
               />
             </Routes>
           </main>
+          <PWAInstallPrompt />
           <FloatingAIButton />
           <Footer />
         </div>
       </BrowserRouter>
     </UserProvider>
-  );
+  </PWAProvider>
+);
 };
 
 export default App;

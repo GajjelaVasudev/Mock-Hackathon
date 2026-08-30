@@ -63,11 +63,21 @@ const UserSchema = new mongoose.Schema({
         default: false
     },
     volunteerStatus: {
-    type: String,
-    enum: ['none', 'requested', 'approved', 'rejected'],
-    default: 'none'
+        type: String,
+        enum: ['none', 'requested', 'approved', 'rejected'],
+        default: 'none'
     },
-    volunteerRequestedAt: Date
+    volunteerRequestedAt: Date,
+    avatar: {
+        type: String,
+        default: null
+    },
+    savedPosts: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'ExperiencePost'
+        }
+    ]
 },{
     timestamps: true
 });

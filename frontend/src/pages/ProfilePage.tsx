@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { UserProfile } from '../types';
+import { NatureAchievementsSection } from '../components/achievements/NatureAchievementsSection';
 
 const AVAILABLE_INTERESTS = [
   'birds',
@@ -114,6 +115,11 @@ export const ProfilePage: React.FC = () => {
         <p style={{ color: 'var(--color-text-muted)', fontSize: '1.05rem' }}>
           Manage your interests, location, and activity preferences used by our personalized recommendation engine.
         </p>
+      </div>
+
+      {/* Nature Achievements & Recognition Section */}
+      <div style={{ marginBottom: '32px' }}>
+        <NatureAchievementsSection userName={currentUser.name} />
       </div>
 
       {/* Main Profile Form */}

@@ -65,21 +65,44 @@ const ExperiencePostSchema = new mongoose.Schema({
   activity: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Activity',
-    required: true,
+    required: false,
+    default: null,
     index: true
   },
   activityIdString: {
-    type: String
+    type: String,
+    default: null
   },
   activityName: {
     type: String,
-    required: true
+    required: false,
+    default: 'Nature Field Observation'
   },
   activityDate: {
     type: String
   },
   activityLocation: {
     type: String
+  },
+  category: {
+    type: String,
+    enum: [
+      'Birds',
+      'Marine',
+      'Trees & Flora',
+      'Conservation',
+      'Field Camps',
+      'Volunteering',
+      'Insects',
+      'General Nature'
+    ],
+    default: 'General Nature',
+    index: true
+  },
+  hashtags: {
+    type: [String],
+    default: [],
+    index: true
   },
   activityCategory: {
     type: String,
@@ -122,6 +145,14 @@ const ExperiencePostSchema = new mongoose.Schema({
     enum: ['active', 'hidden', 'removed'],
     default: 'active',
     index: true
+  },
+  isSeeded: {
+    type: Boolean,
+    default: false
+  },
+  seedSource: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true

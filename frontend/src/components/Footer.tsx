@@ -10,8 +10,8 @@ export const Footer: React.FC = () => {
           {/* Col 1 */}
           <div className="footer-brand">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-              <div className="nav-logo-badge" style={{ background: 'var(--color-emerald-light)' }}>
-                <Compass size={20} />
+              <div className="nav-logo-badge" style={{ background: '#ffffff', border: '1.5px solid rgba(255,255,255,0.2)', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src="/bnhs-logo-bird.png" alt="BNHS Logo" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
               </div>
               <h3 style={{ margin: 0 }}>Bombay Natural History Society</h3>
             </div>

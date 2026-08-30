@@ -442,6 +442,8 @@ export interface ExperiencePost {
   activityLocation?: string;
   activityCategory?: string;
   activityType?: string;
+  category?: string;
+  hashtags?: string[];
   isAttendedVerified: boolean;
   content: string;
   imageUrls: string[];
@@ -449,7 +451,9 @@ export interface ExperiencePost {
   commentsCount: number;
   comments?: CommunityComment[];
   isLiked?: boolean;
+  isSaved?: boolean;
   userReactionType?: string | null;
+  avatar?: string;
   isOwner?: boolean;
   reportsCount?: number;
   status: string;
@@ -526,5 +530,74 @@ export interface MyConversation {
   unreadCount: number;
   lastMessage: ConversationLastMessage;
 }
+
+export type NatureAchievementTier = 'SILVER' | 'GOLD' | 'PLATINUM';
+
+export interface NatureAchievement {
+  tier: NatureAchievementTier;
+  title: string;
+  reward: string;
+  requiredEvents: number;
+  description: string;
+  isUnlocked: boolean;
+  unlockedAt: string | null;
+  certificateId: string | null;
+  fulfillmentStatus: 'unlocked' | 'pending_approval' | 'approved' | 'completed' | 'locked';
+  fulfillmentNotes?: string;
+  remainingEvents: number;
+  verifiedCountAtUnlock?: number | null;
+  id?: string | null;
+}
+
+export interface NatureAchievementSummary {
+  verifiedAttendanceCount: number;
+  currentTier: NatureAchievementTier | null;
+  currentTitle: string | null;
+  nextTier: NatureAchievementTier | null;
+  nextTitle: string | null;
+  requiredForNext: number | null;
+  remainingEventsToNextAchievement: number;
+  progressPercentage: number;
+  tiers: NatureAchievement[];
+}
+
+export interface AdminAchievementItem {
+  _id: string;
+  user: {
+    _id: string;
+    name: string;
+    username?: string;
+    email: string;
+    role: string;
+    avatar?: string;
+  };
+  tier: NatureAchievementTier;
+  title: string;
+  reward: string;
+  requiredEvents: number;
+  verifiedCountAtUnlock: number;
+  unlockedAt: string;
+  certificateId?: string;
+  fulfillmentStatus: 'unlocked' | 'pending_approval' | 'approved' | 'completed';
+  fulfillmentNotes?: string;
+  fulfilledBy?: {
+    name: string;
+    username?: string;
+    role: string;
+  };
+  fulfilledAt?: string;
+}
+
+export interface CertificateDetails {
+  certificateId: string;
+  tier: NatureAchievementTier;
+  title: string;
+  recipientName: string;
+  verifiedEventsCount: number;
+  unlockedAt: string;
+  organization: string;
+  seal: string;
+}
+
 
 

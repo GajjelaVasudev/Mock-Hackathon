@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Leaf, Sparkles, User, Compass, Menu, X, LogIn, LogOut } from 'lucide-react';
+import { Sparkles, User, Compass, Menu, X, LogIn, LogOut } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { NotificationBell } from './NotificationBell';
 
@@ -61,17 +61,24 @@ export const Navbar: React.FC = () => {
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'var(--color-forest-dark)', flexShrink: 0 }}>
           <div
             style={{
-              width: '36px',
-              height: '36px',
+              width: '38px',
+              height: '38px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, var(--color-forest-dark) 0%, var(--color-forest-primary) 100%)',
+              background: '#ffffff',
+              border: '1.5px solid var(--color-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 10px rgba(27, 67, 50, 0.2)',
+              boxShadow: '0 2px 8px rgba(27, 67, 50, 0.08)',
+              padding: '2px',
+              overflow: 'hidden',
             }}
           >
-            <Leaf size={18} color="#b7e4c7" />
+            <img
+              src="/bnhs-logo-bird.png"
+              alt="BNHS Logo"
+              style={{ width: '30px', height: '30px', objectFit: 'contain' }}
+            />
           </div>
           <div>
             <span style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-forest-dark)', display: 'block', lineHeight: 1.1 }}>
